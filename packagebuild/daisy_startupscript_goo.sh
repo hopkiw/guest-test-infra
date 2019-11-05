@@ -37,7 +37,7 @@ install_go
 
 if find . -type f -iname '*.go' >/dev/null; then
   echo "Installing go dependencies"
-  $GO mod download
+  try_command $GO mod download
 fi
 
 echo "Building package(s)"
