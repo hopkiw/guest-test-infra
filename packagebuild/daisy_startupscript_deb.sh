@@ -52,7 +52,7 @@ if grep -q 'golang' packaging/debian/control; then
   install_go
 
   echo "Installing go dependencies"
-  $GO mod download
+  try_command $GO mod download
 fi
 
 echo "Building package(s)"
