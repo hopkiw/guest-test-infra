@@ -13,20 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-PROJECT="$1"
-ZONE="$2"
-DISTROS="$3"            # Distros to build
-GCS_OUTPUT_BUCKET="$4"  # Destination for artifacts
-VERSION=""
-
-function generate_new_version() {
-  local VERSION_OUT
-  if ! VERSION_OUT=`/versiongenerator --token-file-path=${GITHUB_ACCESS_TOKEN} --org=${REPO_OWNER} --repo=${REPO_NAME} 2>&1`; then
-      echo "could not generate version: ${VERSION_OUT}"
-      return 1
-  fi
-  echo $VERSION_OUT
-}
+DISTROS="$1"            # Distros to build for.
+GIT_REF="$2"            # Git ref to build from, in presubmit case.
 
 # Workflow consisting entirely of separate IncludeWorkflow steps referencing
 # build_${distro}.wf.json, which should be checked out from guest-test-infra.
@@ -83,25 +71,6 @@ function generate_build_workflow() {
   echo -e "$config" > "$WF"
 }
 
-tag_commit() {
-  LATEST_VERSION=$(generate_new_version)
-  if [[ "$LATEST_VERSION" != "$VERSION" ]]; then
-    echo "not valid build $LATEST_VERSION != $VERSION"
-    return 1
-  fi
-  TAGGER_CMD="/tagger --token-file-path=${GITHUB_ACCESS_TOKEN} \
-              --tag=${LATEST_VERSION} --sha=${PULL_BASE_SHA} \
-              --org=${REPO_OWNER} --repo=${REPO_NAME}"
-
-  echo "running $TAGGER_CMD ..."
-  TAGGER_CMD_OUT=$(${TAGGER_CMD})
-  if [[ $? -ne 0 ]]; then
-    echo "could not tag github commit: $TAGGER_CMD_OUT"
-    return 1
-  fi
-  return 0
-}
-
 # Sets service account used for daisy and gsutil commands below. Will use
 # default service account for VM or k8s node if not set.
 if [[ -n $GOOGLE_APPLICATION_CREDENTIALS ]]; then
@@ -123,10 +92,9 @@ if [[ "$JOB_TYPE" == "presubmit" ]]; then
   DAISY_VARS+=",git_ref=pull/${PULL_NUMBER}/head"
 fi
 
-## generate version
+## use GIT_REF otherwise
 if [[ "$JOB_TYPE" == "postsubmit" ]]; then
-  VERSION=$(generate_new_version)
-  DAISY_VARS+=",version=${VERSION}"
+  DAISY_VARS+=",git_ref=${GIT_REF}"
 fi
 
 DAISY_CMD="/daisy -project ${PROJECT} -zone ${ZONE} -variables ${DAISY_VARS} ${WF}"
@@ -137,14 +105,6 @@ $DAISY_CMD 2>err | tee out
 if [[ ${PIPESTATUS[0]} -ne 0 ]]; then
   echo "error running daisy: stderr: $(<err)"
   exit 1
-fi
-
-if [[ "$JOB_TYPE" == "postsubmit" ]]; then
-  TAG_OUTPUT=$(tag_commit)
-  if [[ $? -ne 0 ]]; then
-    echo ${TAG_OUTPUT}
-    exit 1
-  fi
 fi
 
 # TODO: pass this in
@@ -160,5 +120,6 @@ fi
 
 # If invoked as periodic, postsubmit, or manually, upload the results.
 if [[ "$JOB_TYPE" != "presubmit" ]]; then
+  gsutil ls "${DAISY_BUCKET}/packages/"
   gsutil cp "${DAISY_BUCKET}/packages/*" $GCS_OUTPUT_BUCKET
 fi
