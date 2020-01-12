@@ -13,8 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-DISTROS="$1"            # Distros to build for.
-GIT_REF="$2"            # Git ref to build from, in presubmit case.
+PROJECT="$1"
+ZONE="$2"
+DISTROS="$3"            # Distros to build for.
 
 # Workflow consisting entirely of separate IncludeWorkflow steps referencing
 # build_${distro}.wf.json, which should be checked out from guest-test-infra.
@@ -92,9 +93,8 @@ if [[ "$JOB_TYPE" == "presubmit" ]]; then
   DAISY_VARS+=",git_ref=pull/${PULL_NUMBER}/head"
 fi
 
-## use GIT_REF otherwise
 if [[ "$JOB_TYPE" == "postsubmit" ]]; then
-  DAISY_VARS+=",git_ref=${GIT_REF}"
+  DAISY_VARS+=",git_ref=${PULL_BASE_REF}"
 fi
 
 DAISY_CMD="/daisy -project ${PROJECT} -zone ${ZONE} -variables ${DAISY_VARS} ${WF}"
@@ -116,10 +116,4 @@ DAISY_BUCKET="gs://$(sed -En "s|(^.*)$pattern||p" out)"
 if [[ -n $ARTIFACTS ]]; then
   echo "copying daisy outputs from ${DAISY_BUCKET}/packages to prow artifacts dir"
   gsutil cp "${DAISY_BUCKET}/packages/*" ${ARTIFACTS}/
-fi
-
-# If invoked as periodic, postsubmit, or manually, upload the results.
-if [[ "$JOB_TYPE" != "presubmit" ]]; then
-  gsutil ls "${DAISY_BUCKET}/packages/"
-  gsutil cp "${DAISY_BUCKET}/packages/*" $GCS_OUTPUT_BUCKET
 fi
