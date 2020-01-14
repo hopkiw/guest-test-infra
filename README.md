@@ -1,7 +1,9 @@
 # Compute Engine Guest OS - Test infrastructure
 
 This repository contains tools, configuration and documentation for the public
-test infrastructure used by the Google Compute Engine Guest OS team.
+test infrastructure used by the Google Compute Engine Guest OS team. For more
+detailed explanation of how these components work and are used, see the [build
+docs](index.md)
 
 ## Docker container images
 
