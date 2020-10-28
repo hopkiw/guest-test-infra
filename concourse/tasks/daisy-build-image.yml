@@ -7,4 +7,4 @@ image_resource:
 
 run:
   path: /daisy
-  args: ["-project=liamh-testing","-zone=us-west1-b","/workflows/((wf))"]
+  args: ["-validate","-project=liamh-testing","-zone=us-west1-b","/workflows/((wf))"]
