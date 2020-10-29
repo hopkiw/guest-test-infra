@@ -1,0 +1,23 @@
+---
+platform: linux
+
+image_resource:
+  type: docker-image
+  source: {repository: google/cloud-sdk, tag: latest}
+
+inputs:
+  - name: compute-image-tools
+
+run:
+  path: gcloud
+  args:
+    - compute
+    - images
+    - create
+    - --source-uri=((tarball))
+    - --family=((family))
+    - --description=((description))
+    - --licenses=((licenses))
+    - --project=((publish_project))
+    - --guest-os-features=((features))
+    - ((image_name))

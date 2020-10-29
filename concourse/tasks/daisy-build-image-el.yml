@@ -10,4 +10,9 @@ inputs:
 
 run:
   path: /daisy
-  args: ["-project=liamh-testing","-zone=us-west1-b","-var:installer_iso=((iso))","./compute-image-tools/daisy_workflows/((wf))"]
+  args:
+  - -project=liamh-testing
+  - -zone=us-west1-b
+  - -var:installer_iso=((iso))
+  - -var:publish_path=((path))
+  - ./compute-image-tools/daisy_workflows/((wf))
