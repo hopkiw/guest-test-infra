@@ -5,6 +5,9 @@ image_resource:
   type: docker-image
   source: {repository: gcr.io/liamh-testing/daisy-with-creds, tag: latest}
 
+inputs:
+  - compute-image-tools
+
 run:
   path: /daisy
-  args: ["-print","-project=liamh-testing","-zone=us-west1-b","-var:installer_iso=((iso))","/workflows/((wf))"]
+  args: ["-project=liamh-testing","-zone=us-west1-b","-var:installer_iso=((iso))","./compute-image-tools/daisy-workflows/((wf))"]
