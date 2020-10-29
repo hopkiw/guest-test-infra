@@ -6,7 +6,7 @@ image_resource:
   source: {repository: gcr.io/liamh-testing/daisy-with-creds, tag: latest}
 
 inputs:
-  - compute-image-tools
+  - name: compute-image-tools
 
 run:
   path: /daisy
