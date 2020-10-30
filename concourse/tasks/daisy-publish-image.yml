@@ -14,10 +14,8 @@ run:
     - compute
     - images
     - create
-    - --source-uri=((tarball))
+    - --source-uri=((path))
     - --family=((family))
-    - --description=((description))
-    - --licenses=((licenses))
-    - --project=((publish_project))
-    - --guest-os-features=((features))
-    - ((image_name))
+    - --description=((name)) built from ((path))
+    - --project=((project))
+    - ((name))
