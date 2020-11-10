@@ -15,7 +15,6 @@ run:
     - -publish_version=((version))
     - -skip_confirmation
     - -direct
-    - -validate
     - -work_project=liamh-testing
     - -publish_project=liamh-testing
     - workflows/((wf))
