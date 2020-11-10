@@ -1,0 +1,19 @@
+---
+platform: linux
+
+image_resource:
+  type: docker-image
+  source: {repository: gcr.io/liamh-testing/gce_image_publish-with-creds, tag: latest}
+
+inputs:
+  - name: workflows
+
+run:
+  args:
+    - ((extra_args))
+    - -source_gcs_path=((gcs_path))
+    - -publish_version=((version))
+    - -skip_confirmation
+    - -direct
+    - -validate
+    - workflows/((wf))
