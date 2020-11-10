@@ -9,4 +9,5 @@ run:
   path: gsutil
   args:
   - ls
+  - -L
   - ((path))
