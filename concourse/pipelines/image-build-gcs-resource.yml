@@ -1,9 +1,5 @@
 ---
 resource_types:
-  - name: datetime-version
-    type: registry-image
-    source:
-      repository: dcsg/datetime-version-resource
   - name: gcs
     type: registry-image
     source:
@@ -309,6 +305,7 @@ jobs:
     old_name: echo-debian-9
     plan:
       - get: guest-test-infra
+      - get: compute-image-tools
       - get: debian-9-gcs
         passed: [build-debian-9]
         trigger: true
@@ -325,12 +322,12 @@ jobs:
         file: build-id-dir/build-id  # produced from generate-version task
       - task: publish-debian-9
         file: guest-test-infra/concourse/tasks/gce-image-publish.yml
+        input_mapping: {workflows: compute-image-tools}
         vars:
           family: debian-9
           gcs_path: ((.:gcs-url))
           version: ((.:publish-version))
-          extra_args: "-var:environment=staging"
-          wf: daisy_workflows/image_publish/debian_9.publish.json
+          wf: daisy_workflows/image_publish/debian/debian_9.publish.json
   - name: publish-to-staging-debian-10
     old_name: echo-debian-10
     plan:

@@ -11,7 +11,6 @@ inputs:
 run:
   path: /gce_image_publish
   args:
-    - ((extra_args))
     - -source_gcs_path=((gcs_path))
     - -publish_version=((version))
     - -skip_confirmation
