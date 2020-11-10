@@ -16,4 +16,5 @@ run:
     - -skip_confirmation
     - -direct
     - -validate
+    - -work_project=liamh-testing
     - workflows/((wf))
