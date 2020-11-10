@@ -17,4 +17,5 @@ run:
     - -direct
     - -work_project=liamh-testing
     - -publish_project=liamh-testing
+    - -var:gcs_source=((gcs_path))
     - workflows/((wf))
