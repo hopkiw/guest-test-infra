@@ -8,6 +8,6 @@ image_resource:
 run:
   path: gsutil
   args:
-    - cp
-    - ((src))
-    - ((dst))
+  - ls
+  - -L
+  - ((path))
