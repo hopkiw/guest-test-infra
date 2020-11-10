@@ -17,4 +17,5 @@ run:
     - -direct
     - -validate
     - -work_project=liamh-testing
+    - -publish_project=liamh-testing
     - workflows/((wf))
