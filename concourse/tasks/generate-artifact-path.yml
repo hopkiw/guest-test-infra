@@ -12,4 +12,4 @@ run:
   path: sh
   args:
   - -c
-  - 'buildid=$(date "+%s"); echo "$buildid" | tee build-id-dir/build-id; touch build-id-dir/rhel-8-v${buildid}-root.tar.gz'
+  - "buildid=$(date '+%s'); echo $buildid | tee build-id-dir/build-id; touch build-id-dir/((prefix))-v${buildid}-root.tar.gz"
