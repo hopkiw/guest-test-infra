@@ -9,7 +9,7 @@ outputs:
   - name: build-id-dir
 
 run:
-  path: bash
+  path: sh
   args:
   - -c
   - "date '+%s' | tee build-id-dir/build-id"
