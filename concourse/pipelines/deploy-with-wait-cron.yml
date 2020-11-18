@@ -1,5 +1,9 @@
 ---
 resource_types:
+  - name: cron-resource
+    type: docker-image
+    source:
+      repository: cftoolsmiths/cron-resource
   - name: datetime-version
     type: registry-image
     source:
