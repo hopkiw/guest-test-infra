@@ -301,8 +301,7 @@ jobs:
         file: guest-test-infra/concourse/tasks/gsutil-ls.yml
         vars:
           path: ((.:gcs-url))
-  - name: publish-to-staging-debian-9
-    old_name: echo-debian-9
+  - name: publish-to-testing-debian-9
     plan:
       - get: guest-test-infra
       - get: compute-image-tools
@@ -310,6 +309,8 @@ jobs:
         passed: [build-debian-9]
         trigger: true
         params: {skip_download: "true"}
+      - load_var: source-version
+        file: debian-9-gcs/version
       - load_var: gcs-url
         file: debian-9-gcs/url
       - task: gsutil-ls
@@ -325,9 +326,10 @@ jobs:
         input_mapping: {workflows: compute-image-tools}
         vars:
           family: debian-9
-          gcs_path: ((.:gcs-url))
-          version: ((.:publish-version))
+          source_version: ((.:gcs-version))
+          publish_version: ((.:publish-version))
           wf: daisy_workflows/image_publish/debian/debian_9.publish.json
+          gcs_path: gs://liamh-export/image_builds_ci/dummy/
   - name: publish-to-staging-debian-10
     old_name: echo-debian-10
     plan:

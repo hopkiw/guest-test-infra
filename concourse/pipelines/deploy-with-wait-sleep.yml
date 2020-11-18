@@ -1,0 +1,61 @@
+---
+resource_types:
+  - name: datetime-version
+    type: registry-image
+    source:
+      repository: dcsg/datetime-version-resource
+
+resources:
+  - name: genversion
+    type: datetime-version
+
+jobs:
+  - name: deploy-to-zone-1
+    plan:
+      - put: genversion
+      - task: deploy-to-zone-1
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: {repository: busybox}
+          run:
+            path: sh
+            args: [-c,"echo hi there"]
+          params:
+            VAR1: "var1"
+            VAR2: "var2"
+  - name: wait-1-hr
+    plan:
+      - get: genversion
+        trigger: true
+        passed: [deploy-to-zone-1]
+      - task: wait-1-hr
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: {repository: busybox}
+          run:
+            path: sh
+            args: [-c,"sleep 3600"]
+          params:
+            VAR1: "var1"
+            VAR2: "var2"
+  - name: deploy-to-zone-2
+    plan:
+      - get: genversion
+        trigger: true
+        passed: [wait-1-hr]
+      - task: deploy-to-zone-2
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: {repository: busybox}
+          run:
+            path: sh
+            args: [-c,"env"]
+          params:
+            VAR1: "var1"
+            VAR2: "var2"

@@ -1,0 +1,54 @@
+---
+resource_types:
+  - name: datetime-version
+    type: registry-image
+    source:
+      repository: dcsg/datetime-version-resource
+
+resources:
+  - name: scheduled-task-zone-2
+    type: cron-resource
+    source:
+      expression: ((scheduled-task-zone-2-expr))
+  - name: guest-test-infra
+    type: git
+    source:
+      uri: https://github.com/hopkiw/guest-test-infra.git
+      branch: concourse-2
+
+jobs:
+  - name: deploy-to-zone-1
+    plan:
+      - task: deploy-to-zone-1
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: {repository: busybox}
+          run:
+            path: sh
+            args: [-c,"echo hi there"]
+          params:
+            VAR1: "var1"
+            VAR2: "var2"
+      - get: guest-test-infra
+      - set_pipeline: self
+        file: guest-test-infra/concourse/pipelines/deploy-with-wait-cron.yml
+        vars:
+          scheduled-task-zone-2-expr: "36 21 * * *"
+  - name: deploy-to-zone-2
+    plan:
+      - get: scheduled-task-zone-2
+        trigger: true
+      - task: deploy-to-zone-2
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: {repository: busybox}
+          run:
+            path: sh
+            args: [-c,"env"]
+          params:
+            VAR1: "var1"
+            VAR2: "var2"
