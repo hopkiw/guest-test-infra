@@ -1,0 +1,59 @@
+---
+resource_types:
+  - name: smuggler
+    type: docker-image
+    source:
+      repository: redfactorlabs/concourse-smuggler-resource
+      tag: alpine
+
+resources:
+  - name: zone-2-after-2-hours
+    type: smuggler
+    source:
+      smuggler_debug: true
+      commands:
+        check: |
+          ls
+        in: |
+          ls
+          echo "$SMUGGLER_VERSION_ID" > "${SMUGGLER_DESTINATION_DIR}/version"
+          echo "version=${SMUGGLER_VERSION_ID:-unset}" > ${SMUGGLER_OUTPUT_DIR}/metadata
+          echo "after=${SMUGGLER_after:-unset}" >> ${SMUGGLER_OUTPUT_DIR}/metadata
+        out: |
+          ls
+          version="$(date '+%s')"
+          echo "$version" > "${SMUGGLER_OUTPUT_DIR}"/versions
+          echo "version=${version}" >> ${SMUGGLER_OUTPUT_DIR}/metadata
+
+jobs:
+  - name: deploy-to-zone-1
+    plan:
+      - task: deploy-to-zone-1
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: {repository: busybox}
+          run:
+            path: sh
+            args: [-c,"echo hi there"]
+      - get: zone-2-after-2-hours
+        params:
+          seed: "1605682860"
+  - name: deploy-to-zone-2
+    plan:
+      - get: zone-2-after-2-hours
+        trigger: true
+        passed: [deploy-to-zone-1]
+      - task: deploy-to-zone-2
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: {repository: busybox}
+          run:
+            path: sh
+            args: [-c,"env"]
+          params:
+            VAR1: "var1"
+            VAR2: "var2"

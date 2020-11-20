@@ -39,7 +39,7 @@ jobs:
       - set_pipeline: self
         file: guest-test-infra/concourse/pipelines/deploy-with-wait-cron.yml
         vars:
-          scheduled-task-zone-2-expr: "36 21 * * *"
+          scheduled-task-zone-2-expr: "41 05 * * *"
   - name: deploy-to-zone-2
     plan:
       - get: scheduled-task-zone-2
