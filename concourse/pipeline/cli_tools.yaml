@@ -188,7 +188,7 @@ jobs:
             run:
               dir: compute-image-tools/cli_tools/gce_export
               path: go  # path must be specified
-              args: ['build', '-o=../../../build-windows/gce_export']
+              args: ['build', '-v', '-o=../../../build-windows/gce_export']
         - task: gce-export-build-linux
           config:
             platform: linux
@@ -204,7 +204,7 @@ jobs:
             run:
               dir: compute-image-tools/cli_tools/gce_export
               path: go  # path must be specified
-              args: ['build', '-o=../../../build-linux/gce_export']
+              args: ['build', '-v', '-o=../../../build-linux/gce_export']
         - task: gce-export-build-darwin
           config:
             platform: linux
@@ -220,7 +220,7 @@ jobs:
             run:
               dir: compute-image-tools/cli_tools/gce_export
               path: go  # path must be specified
-              args: ['build', '-o=../../../build-darwin/gce_export']
+              args: ['build', '-v', '-o=../../../build-darwin/gce_export']
       - task: copy-binary
         config:
           platform: linux
@@ -251,6 +251,49 @@ jobs:
               - --context=compute-image-tools
               - --dockerfile=compute-image-tools/gce_export.Dockerfile
               - --no-push
+      - in_parallel:
+        - task: gce-export-push-gcs-linux
+          config:
+            platform: linux
+            image_resource:
+              type: registry-image
+              source: {repository: gcr.io/cloud-builders/gsutil}
+            inputs:
+              - name: build-linux
+              - name: creds
+            params:
+              GOOGLE_APPLICATION_CREDENTIALS: creds/credentials.json
+            run:
+              path: gsutil  # path must be specified
+              args: ['cp', 'build-linux/*', 'gs://gcp-guest/latest/linux/']
+        - task: gce-export-push-gcs-windows
+          config:
+            platform: linux
+            image_resource:
+              type: registry-image
+              source: {repository: gcr.io/cloud-builders/gsutil}
+            inputs:
+              - name: build-windows
+              - name: creds
+            params:
+              GOOGLE_APPLICATION_CREDENTIALS: creds/credentials.json
+            run:
+              path: gsutil  # path must be specified
+              args: ['cp', 'build-windows/*', 'gs://gcp-guest/latest/windows/']
+        - task: gce-export-push-gcs-darwin
+          config:
+            platform: linux
+            image_resource:
+              type: registry-image
+              source: {repository: gcr.io/cloud-builders/gsutil}
+            inputs:
+              - name: build-darwin
+              - name: creds
+            params:
+              GOOGLE_APPLICATION_CREDENTIALS: creds/credentials.json
+            run:
+              path: gsutil  # path must be specified
+              args: ['cp', 'build-darwin/*', 'gs://gcp-guest/latest/darwin/']
   - name: import-precheck
     plan:
       - get: compute-image-tools
