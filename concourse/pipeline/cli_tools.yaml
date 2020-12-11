@@ -1,0 +1,550 @@
+resources:
+  - name: compute-image-tools
+    type: git
+    source:
+      branch: attempt
+      uri: https://github.com/hopkiw/compute-image-tools.git
+
+jobs:
+  - name: daisy
+    plan:
+      - get: compute-image-tools
+      - load_var: commit-sha
+        file: compute-image-tools/.git/ref
+      - task: setup-creds
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: {repository: busybox}
+          outputs:
+            - name: creds
+          run:
+            path: /bin/sh # path must be specified
+            args: ["-ec", "echo '((gcs-key.credential))' > creds/credentials.json"]
+      - in_parallel:
+        - task: daisy-build-windows
+          config:
+            platform: linux
+            image_resource:
+              type: registry-image
+              source: {repository: golang}
+            inputs:
+              - name: compute-image-tools
+            outputs:
+              - name: build-windows
+            params:
+              GOOS: windows
+            run:
+              dir: compute-image-tools/daisy/cli
+              path: go  # path must be specified
+              args: ['build', '-o=../../../build-windows/daisy']
+        - task: daisy-build-linux
+          config:
+            platform: linux
+            image_resource:
+              type: registry-image
+              source: {repository: golang}
+            inputs:
+              - name: compute-image-tools
+            outputs:
+              - name: build-linux
+            params:
+              CGO_ENABLED: 0
+            run:
+              dir: compute-image-tools/daisy/cli
+              path: go  # path must be specified
+              args: ['build', '-o=../../../build-linux/daisy']
+        - task: daisy-build-darwin
+          config:
+            platform: linux
+            image_resource:
+              type: registry-image
+              source: {repository: golang}
+            inputs:
+              - name: compute-image-tools
+            outputs:
+              - name: build-darwin
+            params:
+              GOOS: darwin
+            run:
+              dir: compute-image-tools/daisy/cli
+              path: go  # path must be specified
+              args: ['build', '-o=../../../build-darwin/daisy']
+      - task: copy-binary
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: {repository: busybox}
+          inputs:
+            - name: build-linux
+            - name: compute-image-tools
+          outputs:
+            - name: compute-image-tools
+          run:
+            path: cp  # path must be specified
+            args: ['build-linux/daisy', 'compute-image-tools/daisy/cli/daisy']
+      - task: publish-daisy
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: {repository: gcr.io/kaniko-project/executor, tag: v1.1.0}
+          inputs:
+            - name: compute-image-tools
+          run:
+            path: /kaniko/executor  # path must be specified
+            args:
+              - --destination=gcr.io/gcp-guest/daisy:latest
+              - --destination=gcr.io/gcp-guest/daisy:((.:commit-sha))
+              - --context=compute-image-tools
+              - --dockerfile=compute-image-tools/daisy.Dockerfile
+              - --no-push
+      - in_parallel:
+        - task: daisy-push-gcs-linux
+          config:
+            platform: linux
+            image_resource:
+              type: registry-image
+              source: {repository: gcr.io/cloud-builders/gsutil}
+            inputs:
+              - name: build-linux
+              - name: creds
+            params:
+              GOOGLE_APPLICATION_CREDENTIALS: creds/credentials.json
+            run:
+              path: gsutil  # path must be specified
+              args: ['cp', 'build-linux/*', 'gs://gcp-guest/latest/linux/']
+        - task: daisy-push-gcs-windows
+          config:
+            platform: linux
+            image_resource:
+              type: registry-image
+              source: {repository: gcr.io/cloud-builders/gsutil}
+            inputs:
+              - name: build-windows
+              - name: creds
+            params:
+              GOOGLE_APPLICATION_CREDENTIALS: creds/credentials.json
+            run:
+              path: gsutil  # path must be specified
+              args: ['cp', 'build-windows/*', 'gs://gcp-guest/latest/windows/']
+        - task: daisy-push-gcs-darwin
+          config:
+            platform: linux
+            image_resource:
+              type: registry-image
+              source: {repository: gcr.io/cloud-builders/gsutil}
+            inputs:
+              - name: build-darwin
+              - name: creds
+            params:
+              GOOGLE_APPLICATION_CREDENTIALS: creds/credentials.json
+            run:
+              path: gsutil  # path must be specified
+              args: ['cp', 'build-darwin/*', 'gs://gcp-guest/latest/darwin/']
+
+
+  - name: gce-image-publish
+    plan:
+      - get: compute-image-tools
+      - load_var: commit-sha
+        file: compute-image-tools/.git/ref
+      - task: publish-gce-image-publish
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: {repository: gcr.io/kaniko-project/executor, tag: v1.1.0}
+          inputs:
+            - name: compute-image-tools
+          run:
+            path: /kaniko/executor  # path must be specified
+            args:
+              - --destination=gcr.io/gcp-guest/gce_image_publish:latest
+              - --destination=gcr.io/gcp-guest/gce_image_publish:((.:commit-sha))
+              - --context=compute-image-tools
+              - --dockerfile=compute-image-tools/gce_image_publish.Dockerfile
+              - --no-push
+  - name: gce-export
+    plan:
+      - get: compute-image-tools
+      - load_var: commit-sha
+        file: compute-image-tools/.git/ref
+      - in_parallel:
+        - task: gce-export-build-windows
+          config:
+            platform: linux
+            image_resource:
+              type: registry-image
+              source: {repository: golang}
+            inputs:
+              - name: compute-image-tools
+            outputs:
+              - name: build-windows
+            params:
+              GOOS: windows
+            run:
+              dir: compute-image-tools/cli_tools/gce_export
+              path: go  # path must be specified
+              args: ['build', '-o=../../../build-windows/gce_export']
+        - task: gce-export-build-linux
+          config:
+            platform: linux
+            image_resource:
+              type: registry-image
+              source: {repository: golang}
+            inputs:
+              - name: compute-image-tools
+            outputs:
+              - name: build-linux
+            params:
+              CGO_ENABLED: 0
+            run:
+              dir: compute-image-tools/cli_tools/gce_export
+              path: go  # path must be specified
+              args: ['build', '-o=../../../build-linux/gce_export']
+        - task: gce-export-build-darwin
+          config:
+            platform: linux
+            image_resource:
+              type: registry-image
+              source: {repository: golang}
+            inputs:
+              - name: compute-image-tools
+            outputs:
+              - name: build-darwin
+            params:
+              GOOS: darwin
+            run:
+              dir: compute-image-tools/cli_tools/gce_export
+              path: go  # path must be specified
+              args: ['build', '-o=../../../build-darwin/gce_export']
+      - task: copy-binary
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: {repository: busybox}
+          inputs:
+            - name: build-linux
+            - name: compute-image-tools
+          outputs:
+            - name: compute-image-tools
+          run:
+            path: cp  # path must be specified
+            args: ['build-linux/gce_export', 'compute-image-tools/cli_tools/gce_export/gce_export']
+      - task: publish-gce-export
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: {repository: gcr.io/kaniko-project/executor, tag: v1.1.0}
+          inputs:
+            - name: compute-image-tools
+          run:
+            path: /kaniko/executor  # path must be specified
+            args:
+              - --destination=gcr.io/gcp-guest/gce_export:latest
+              - --destination=gcr.io/gcp-guest/gce_export:((.:commit-sha))
+              - --context=compute-image-tools
+              - --dockerfile=compute-image-tools/gce_export.Dockerfile
+              - --no-push
+  - name: import-precheck
+    plan:
+      - get: compute-image-tools
+      - load_var: commit-sha
+        file: compute-image-tools/.git/ref
+      - task: publish-import-precheck
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: {repository: gcr.io/kaniko-project/executor, tag: v1.1.0}
+          inputs:
+            - name: compute-image-tools
+          run:
+            path: /kaniko/executor  # path must be specified
+            args:
+              - --destination=gcr.io/gcp-guest/import_precheck:latest
+              - --destination=gcr.io/gcp-guest/import_precheck:((.:commit-sha))
+              - --context=compute-image-tools
+              - --dockerfile=compute-image-tools/import_precheck.Dockerfile
+              - --no-push
+  - name: gce-vm-image-import
+    plan:
+      - get: compute-image-tools
+      - load_var: commit-sha
+        file: compute-image-tools/.git/ref
+      - task: publish-gce-vm-image-import
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: {repository: gcr.io/kaniko-project/executor, tag: v1.1.0}
+          inputs:
+            - name: compute-image-tools
+          run:
+            path: /kaniko/executor  # path must be specified
+            args:
+              - --destination=gcr.io/gcp-guest/gce_vm_image_import:latest
+              - --destination=gcr.io/gcp-guest/gce_vm_image_import:((.:commit-sha))
+              - --destination=us-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_import:latest
+              - --destination=us-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_import:((.:commit-sha))
+              - --destination=us-central1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_import:latest
+              - --destination=us-central1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_import:((.:commit-sha))
+              - --destination=us-west1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_import:latest
+              - --destination=us-west1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_import:((.:commit-sha))
+              - --destination=us-west2-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_import:latest
+              - --destination=us-west2-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_import:((.:commit-sha))
+              - --destination=us-east1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_import:latest
+              - --destination=us-east1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_import:((.:commit-sha))
+              - --destination=us-east4-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_import:latest
+              - --destination=us-east4-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_import:((.:commit-sha))
+              - --destination=northamerica-northeast1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_import:latest
+              - --destination=northamerica-northeast1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_import:((.:commit-sha))
+              - --destination=southamerica-east1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_import:latest
+              - --destination=southamerica-east1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_import:((.:commit-sha))
+              - --destination=europe-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_import:latest
+              - --destination=europe-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_import:((.:commit-sha))
+              - --destination=europe-north1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_import:latest
+              - --destination=europe-north1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_import:((.:commit-sha))
+              - --destination=europe-west1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_import:latest
+              - --destination=europe-west1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_import:((.:commit-sha))
+              - --destination=europe-west2-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_import:latest
+              - --destination=europe-west2-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_import:((.:commit-sha))
+              - --destination=europe-west3-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_import:latest
+              - --destination=europe-west3-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_import:((.:commit-sha))
+              - --destination=europe-west4-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_import:latest
+              - --destination=europe-west4-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_import:((.:commit-sha))
+              - --destination=europe-west6-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_import:latest
+              - --destination=europe-west6-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_import:((.:commit-sha))
+              - --destination=asia-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_import:latest
+              - --destination=asia-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_import:((.:commit-sha))
+              - --destination=asia-east1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_import:latest
+              - --destination=asia-east1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_import:((.:commit-sha))
+              - --destination=asia-east2-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_import:latest
+              - --destination=asia-east2-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_import:((.:commit-sha))
+              - --destination=asia-northeast1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_import:latest
+              - --destination=asia-northeast1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_import:((.:commit-sha))
+              - --destination=asia-northeast2-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_import:latest
+              - --destination=asia-northeast2-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_import:((.:commit-sha))
+              - --destination=asia-south1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_import:latest
+              - --destination=asia-south1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_import:((.:commit-sha))
+              - --destination=asia-southeast1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_import:latest
+              - --destination=asia-southeast1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_import:((.:commit-sha))
+              - --destination=australia-southeast1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_import:latest
+              - --destination=australia-southeast1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_import:((.:commit-sha))
+              - --destination=gcr.io/gcp-guest/gce_vm_image_import:latest
+              - --destination=gcr.io/gcp-guest/gce_vm_image_import:((.:commit-sha))
+              - --context=compute-image-tools
+              - --dockerfile=compute-image-tools/gce_vm_image_import.Dockerfile
+              - --no-push
+  - name: gce-vm-image-export
+    plan:
+      - get: compute-image-tools
+      - load_var: commit-sha
+        file: compute-image-tools/.git/ref
+      - task: publish-gce-vm-image-export
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: {repository: gcr.io/kaniko-project/executor, tag: v1.1.0}
+          inputs:
+            - name: compute-image-tools
+          run:
+            path: /kaniko/executor  # path must be specified
+            args:
+              - --destination=gcr.io/gcp-guest/gce_vm_image_export:latest
+              - --destination=gcr.io/gcp-guest/gce_vm_image_export:((.:commit-sha))
+              - --destination=us-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_export:latest
+              - --destination=us-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_export:((.:commit-sha))
+              - --destination=us-central1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_export:latest
+              - --destination=us-central1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_export:((.:commit-sha))
+              - --destination=us-west1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_export:latest
+              - --destination=us-west1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_export:((.:commit-sha))
+              - --destination=us-west2-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_export:latest
+              - --destination=us-west2-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_export:((.:commit-sha))
+              - --destination=us-east1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_export:latest
+              - --destination=us-east1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_export:((.:commit-sha))
+              - --destination=us-east4-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_export:latest
+              - --destination=us-east4-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_export:((.:commit-sha))
+              - --destination=northamerica-northeast1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_export:latest
+              - --destination=northamerica-northeast1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_export:((.:commit-sha))
+              - --destination=southamerica-east1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_export:latest
+              - --destination=southamerica-east1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_export:((.:commit-sha))
+              - --destination=europe-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_export:latest
+              - --destination=europe-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_export:((.:commit-sha))
+              - --destination=europe-north1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_export:latest
+              - --destination=europe-north1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_export:((.:commit-sha))
+              - --destination=europe-west1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_export:latest
+              - --destination=europe-west1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_export:((.:commit-sha))
+              - --destination=europe-west2-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_export:latest
+              - --destination=europe-west2-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_export:((.:commit-sha))
+              - --destination=europe-west3-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_export:latest
+              - --destination=europe-west3-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_export:((.:commit-sha))
+              - --destination=europe-west4-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_export:latest
+              - --destination=europe-west4-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_export:((.:commit-sha))
+              - --destination=europe-west6-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_export:latest
+              - --destination=europe-west6-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_export:((.:commit-sha))
+              - --destination=asia-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_export:latest
+              - --destination=asia-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_export:((.:commit-sha))
+              - --destination=asia-east1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_export:latest
+              - --destination=asia-east1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_export:((.:commit-sha))
+              - --destination=asia-east2-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_export:latest
+              - --destination=asia-east2-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_export:((.:commit-sha))
+              - --destination=asia-northeast1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_export:latest
+              - --destination=asia-northeast1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_export:((.:commit-sha))
+              - --destination=asia-northeast2-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_export:latest
+              - --destination=asia-northeast2-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_export:((.:commit-sha))
+              - --destination=asia-south1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_export:latest
+              - --destination=asia-south1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_export:((.:commit-sha))
+              - --destination=asia-southeast1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_export:latest
+              - --destination=asia-southeast1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_export:((.:commit-sha))
+              - --destination=australia-southeast1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_export:latest
+              - --destination=australia-southeast1-docker.pkg.dev/gcp-guest/wrappers/gce_vm_image_export:((.:commit-sha))
+              - --destination=gcr.io/gcp-guest/gce_vm_image_export:latest
+              - --destination=gcr.io/gcp-guest/gce_vm_image_export:((.:commit-sha))
+              - --context=compute-image-tools
+              - --dockerfile=compute-image-tools/gce_vm_image_export.Dockerfile
+              - --no-push
+  - name: gce-ovf-import
+    plan:
+      - get: compute-image-tools
+      - load_var: commit-sha
+        file: compute-image-tools/.git/ref
+      - task: publish-gce-ovf-import
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: {repository: gcr.io/kaniko-project/executor, tag: v1.1.0}
+          inputs:
+            - name: compute-image-tools
+          run:
+            path: /kaniko/executor  # path must be specified
+            args:
+              - --destination=gcr.io/gcp-guest/gce_ovf_import:latest
+              - --destination=gcr.io/gcp-guest/gce_ovf_import:((.:commit-sha))
+              - --destination=us-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_import:latest
+              - --destination=us-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_import:((.:commit-sha))
+              - --destination=us-central1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_import:latest
+              - --destination=us-central1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_import:((.:commit-sha))
+              - --destination=us-west1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_import:latest
+              - --destination=us-west1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_import:((.:commit-sha))
+              - --destination=us-west2-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_import:latest
+              - --destination=us-west2-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_import:((.:commit-sha))
+              - --destination=us-east1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_import:latest
+              - --destination=us-east1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_import:((.:commit-sha))
+              - --destination=us-east4-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_import:latest
+              - --destination=us-east4-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_import:((.:commit-sha))
+              - --destination=northamerica-northeast1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_import:latest
+              - --destination=northamerica-northeast1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_import:((.:commit-sha))
+              - --destination=southamerica-east1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_import:latest
+              - --destination=southamerica-east1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_import:((.:commit-sha))
+              - --destination=europe-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_import:latest
+              - --destination=europe-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_import:((.:commit-sha))
+              - --destination=europe-north1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_import:latest
+              - --destination=europe-north1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_import:((.:commit-sha))
+              - --destination=europe-west1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_import:latest
+              - --destination=europe-west1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_import:((.:commit-sha))
+              - --destination=europe-west2-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_import:latest
+              - --destination=europe-west2-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_import:((.:commit-sha))
+              - --destination=europe-west3-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_import:latest
+              - --destination=europe-west3-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_import:((.:commit-sha))
+              - --destination=europe-west4-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_import:latest
+              - --destination=europe-west4-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_import:((.:commit-sha))
+              - --destination=europe-west6-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_import:latest
+              - --destination=europe-west6-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_import:((.:commit-sha))
+              - --destination=asia-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_import:latest
+              - --destination=asia-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_import:((.:commit-sha))
+              - --destination=asia-east1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_import:latest
+              - --destination=asia-east1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_import:((.:commit-sha))
+              - --destination=asia-east2-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_import:latest
+              - --destination=asia-east2-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_import:((.:commit-sha))
+              - --destination=asia-northeast1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_import:latest
+              - --destination=asia-northeast1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_import:((.:commit-sha))
+              - --destination=asia-northeast2-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_import:latest
+              - --destination=asia-northeast2-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_import:((.:commit-sha))
+              - --destination=asia-south1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_import:latest
+              - --destination=asia-south1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_import:((.:commit-sha))
+              - --destination=asia-southeast1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_import:latest
+              - --destination=asia-southeast1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_import:((.:commit-sha))
+              - --destination=australia-southeast1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_import:latest
+              - --destination=australia-southeast1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_import:((.:commit-sha))
+              - --destination=gcr.io/gcp-guest/gce_vm_ovf_import:latest
+              - --destination=gcr.io/gcp-guest/gce_vm_ovf_import:((.:commit-sha))
+              - --context=compute-image-tools
+              - --dockerfile=compute-image-tools/gce_ovf_import.Dockerfile
+              - --no-push
+  - name: gce-ovf-windows-upgrade
+    plan:
+      - get: compute-image-tools
+      - load_var: commit-sha
+        file: compute-image-tools/.git/ref
+      - task: publish-gce-ovf-windows-upgrade
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: {repository: gcr.io/kaniko-project/executor, tag: v1.1.0}
+          inputs:
+            - name: compute-image-tools
+          run:
+            path: /kaniko/executor  # path must be specified
+            args:
+              - --destination=gcr.io/gcp-guest/gce_ovf_windows_upgrade:latest
+              - --destination=gcr.io/gcp-guest/gce_ovf_windows_upgrade:((.:commit-sha))
+              - --destination=us-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_windows_upgrade:latest
+              - --destination=us-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_windows_upgrade:((.:commit-sha))
+              - --destination=us-central1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_windows_upgrade:latest
+              - --destination=us-central1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_windows_upgrade:((.:commit-sha))
+              - --destination=us-west1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_windows_upgrade:latest
+              - --destination=us-west1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_windows_upgrade:((.:commit-sha))
+              - --destination=us-west2-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_windows_upgrade:latest
+              - --destination=us-west2-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_windows_upgrade:((.:commit-sha))
+              - --destination=us-east1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_windows_upgrade:latest
+              - --destination=us-east1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_windows_upgrade:((.:commit-sha))
+              - --destination=us-east4-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_windows_upgrade:latest
+              - --destination=us-east4-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_windows_upgrade:((.:commit-sha))
+              - --destination=northamerica-northeast1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_windows_upgrade:latest
+              - --destination=northamerica-northeast1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_windows_upgrade:((.:commit-sha))
+              - --destination=southamerica-east1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_windows_upgrade:latest
+              - --destination=southamerica-east1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_windows_upgrade:((.:commit-sha))
+              - --destination=europe-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_windows_upgrade:latest
+              - --destination=europe-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_windows_upgrade:((.:commit-sha))
+              - --destination=europe-north1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_windows_upgrade:latest
+              - --destination=europe-north1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_windows_upgrade:((.:commit-sha))
+              - --destination=europe-west1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_windows_upgrade:latest
+              - --destination=europe-west1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_windows_upgrade:((.:commit-sha))
+              - --destination=europe-west2-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_windows_upgrade:latest
+              - --destination=europe-west2-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_windows_upgrade:((.:commit-sha))
+              - --destination=europe-west3-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_windows_upgrade:latest
+              - --destination=europe-west3-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_windows_upgrade:((.:commit-sha))
+              - --destination=europe-west4-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_windows_upgrade:latest
+              - --destination=europe-west4-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_windows_upgrade:((.:commit-sha))
+              - --destination=europe-west6-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_windows_upgrade:latest
+              - --destination=europe-west6-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_windows_upgrade:((.:commit-sha))
+              - --destination=asia-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_windows_upgrade:latest
+              - --destination=asia-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_windows_upgrade:((.:commit-sha))
+              - --destination=asia-east1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_windows_upgrade:latest
+              - --destination=asia-east1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_windows_upgrade:((.:commit-sha))
+              - --destination=asia-east2-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_windows_upgrade:latest
+              - --destination=asia-east2-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_windows_upgrade:((.:commit-sha))
+              - --destination=asia-northeast1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_windows_upgrade:latest
+              - --destination=asia-northeast1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_windows_upgrade:((.:commit-sha))
+              - --destination=asia-northeast2-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_windows_upgrade:latest
+              - --destination=asia-northeast2-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_windows_upgrade:((.:commit-sha))
+              - --destination=asia-south1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_windows_upgrade:latest
+              - --destination=asia-south1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_windows_upgrade:((.:commit-sha))
+              - --destination=asia-southeast1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_windows_upgrade:latest
+              - --destination=asia-southeast1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_windows_upgrade:((.:commit-sha))
+              - --destination=australia-southeast1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_windows_upgrade:latest
+              - --destination=australia-southeast1-docker.pkg.dev/gcp-guest/wrappers/gce_ovf_windows_upgrade:((.:commit-sha))
+              - --destination=gcr.io/gcp-guest/gce_vm_ovf_windows_upgrade:latest
+              - --destination=gcr.io/gcp-guest/gce_vm_ovf_windows_upgrade:((.:commit-sha))
+              - --context=compute-image-tools
+              - --dockerfile=compute-image-tools/gce_ovf_windows_upgrade.Dockerfile
+              - --no-push
