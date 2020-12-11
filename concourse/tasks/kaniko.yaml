@@ -1,0 +1,33 @@
+platform: linux
+
+image_resource:
+  type: registry-image
+  source: {repository: gcr.io/kaniko-project/executor, tag: "v1.1.0"}
+
+inputs:
+  - name: compute-image-tools
+  - name: creds
+  #- name: workspace
+
+params:
+  XGOOGLE_APPLICATION_CREDENTIALS: creds/credentials.json
+
+#run:
+#  path: /bin/sh
+#  args:
+#    - -ecx
+#    - |
+#      pwd
+#      GOOGLE_APPLICATION_CREDENTIALS=$(pwd)/$GOOGLE_APPLICATION_CREDENTIALS
+#      /kaniko/executor \
+#      --destination=gcr.io/gcp-guest/daisy:testing \
+#      --context=./compute-image-tools \
+#      --dockerfile=./compute-image-tools/daisy.Dockerfile \
+#      --verbosity=trace
+run:
+  path: /kaniko/executor
+  args:
+    - --destination=gcr.io/gcp-guest/daisy:testing
+    - --context=compute-image-tools
+    - --dockerfile=compute-image-tools/daisy.Dockerfile
+    - --verbosity=trace
