@@ -21,56 +21,55 @@ jobs:
             - name: creds
           run:
             path: /bin/sh # path must be specified
-            args: ["-ec", "echo '((gcs-key.credential))' > creds/credentials.json"]
-      - in_parallel:
-        - task: daisy-build-windows
-          config:
-            platform: linux
-            image_resource:
-              type: registry-image
-              source: {repository: golang}
-            inputs:
-              - name: compute-image-tools
-            outputs:
-              - name: build-windows
-            params:
-              GOOS: windows
-            run:
-              dir: compute-image-tools/daisy/cli
-              path: go  # path must be specified
-              args: ['build', '-o=../../../build-windows/daisy']
-        - task: daisy-build-linux
-          config:
-            platform: linux
-            image_resource:
-              type: registry-image
-              source: {repository: golang}
-            inputs:
-              - name: compute-image-tools
-            outputs:
-              - name: build-linux
-            params:
-              CGO_ENABLED: 0
-            run:
-              dir: compute-image-tools/daisy/cli
-              path: go  # path must be specified
-              args: ['build', '-o=../../../build-linux/daisy']
-        - task: daisy-build-darwin
-          config:
-            platform: linux
-            image_resource:
-              type: registry-image
-              source: {repository: golang}
-            inputs:
-              - name: compute-image-tools
-            outputs:
-              - name: build-darwin
-            params:
-              GOOS: darwin
-            run:
-              dir: compute-image-tools/daisy/cli
-              path: go  # path must be specified
-              args: ['build', '-o=../../../build-darwin/daisy']
+            args: ["-ec", "echo '((gcs-key.credential))' > creds/credentials.json; echo -e '[Credentials]\ngs_service_key_file = creds/credentials.json' > creds/boto"]
+      - task: daisy-build-windows
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: {repository: golang}
+          inputs:
+            - name: compute-image-tools
+          outputs:
+            - name: build-windows
+          params:
+            GOOS: windows
+          run:
+            dir: compute-image-tools/daisy/cli
+            path: go  # path must be specified
+            args: ['build', '-v', '-o=../../../build-windows/daisy']
+      - task: daisy-build-linux
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: {repository: golang}
+          inputs:
+            - name: compute-image-tools
+          outputs:
+            - name: build-linux
+          params:
+            CGO_ENABLED: 0
+          run:
+            dir: compute-image-tools/daisy/cli
+            path: go  # path must be specified
+            args: ['build', '-v', '-o=../../../build-linux/daisy']
+      - task: daisy-build-darwin
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: {repository: golang}
+          inputs:
+            - name: compute-image-tools
+          outputs:
+            - name: build-darwin
+          params:
+            GOOS: darwin
+          run:
+            dir: compute-image-tools/daisy/cli
+            path: go  # path must be specified
+            args: ['build', '-v', '-o=../../../build-darwin/daisy']
       - task: copy-binary
         config:
           platform: linux
@@ -101,49 +100,48 @@ jobs:
               - --context=compute-image-tools
               - --dockerfile=compute-image-tools/daisy.Dockerfile
               - --no-push
-      - in_parallel:
-        - task: daisy-push-gcs-linux
-          config:
-            platform: linux
-            image_resource:
-              type: registry-image
-              source: {repository: gcr.io/cloud-builders/gsutil}
-            inputs:
-              - name: build-linux
-              - name: creds
-            params:
-              GOOGLE_APPLICATION_CREDENTIALS: creds/credentials.json
-            run:
-              path: gsutil  # path must be specified
-              args: ['cp', 'build-linux/*', 'gs://gcp-guest/latest/linux/']
-        - task: daisy-push-gcs-windows
-          config:
-            platform: linux
-            image_resource:
-              type: registry-image
-              source: {repository: gcr.io/cloud-builders/gsutil}
-            inputs:
-              - name: build-windows
-              - name: creds
-            params:
-              GOOGLE_APPLICATION_CREDENTIALS: creds/credentials.json
-            run:
-              path: gsutil  # path must be specified
-              args: ['cp', 'build-windows/*', 'gs://gcp-guest/latest/windows/']
-        - task: daisy-push-gcs-darwin
-          config:
-            platform: linux
-            image_resource:
-              type: registry-image
-              source: {repository: gcr.io/cloud-builders/gsutil}
-            inputs:
-              - name: build-darwin
-              - name: creds
-            params:
-              GOOGLE_APPLICATION_CREDENTIALS: creds/credentials.json
-            run:
-              path: gsutil  # path must be specified
-              args: ['cp', 'build-darwin/*', 'gs://gcp-guest/latest/darwin/']
+      - task: daisy-push-gcs-linux
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: {repository: gcr.io/cloud-builders/gsutil}
+          inputs:
+            - name: build-linux
+            - name: creds
+          params:
+            BOTO_CONFIG: creds/boto
+          run:
+            path: gsutil  # path must be specified
+            args: ['cp', 'build-linux/*', 'gs://gcp-guest/latest/linux/']
+      - task: daisy-push-gcs-windows
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: {repository: gcr.io/cloud-builders/gsutil}
+          inputs:
+            - name: build-windows
+            - name: creds
+          params:
+            BOTO_CONFIG: creds/boto
+          run:
+            path: gsutil  # path must be specified
+            args: ['cp', 'build-windows/*', 'gs://gcp-guest/latest/windows/']
+      - task: daisy-push-gcs-darwin
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: {repository: gcr.io/cloud-builders/gsutil}
+          inputs:
+            - name: build-darwin
+            - name: creds
+          params:
+            BOTO_CONFIG: creds/boto
+          run:
+            path: gsutil  # path must be specified
+            args: ['cp', 'build-darwin/*', 'gs://gcp-guest/latest/darwin/']
 
 
   - name: gce-image-publish
@@ -172,55 +170,54 @@ jobs:
       - get: compute-image-tools
       - load_var: commit-sha
         file: compute-image-tools/.git/ref
-      - in_parallel:
-        - task: gce-export-build-windows
-          config:
-            platform: linux
-            image_resource:
-              type: registry-image
-              source: {repository: golang}
-            inputs:
-              - name: compute-image-tools
-            outputs:
-              - name: build-windows
-            params:
-              GOOS: windows
-            run:
-              dir: compute-image-tools/cli_tools/gce_export
-              path: go  # path must be specified
-              args: ['build', '-v', '-o=../../../build-windows/gce_export']
-        - task: gce-export-build-linux
-          config:
-            platform: linux
-            image_resource:
-              type: registry-image
-              source: {repository: golang}
-            inputs:
-              - name: compute-image-tools
-            outputs:
-              - name: build-linux
-            params:
-              CGO_ENABLED: 0
-            run:
-              dir: compute-image-tools/cli_tools/gce_export
-              path: go  # path must be specified
-              args: ['build', '-v', '-o=../../../build-linux/gce_export']
-        - task: gce-export-build-darwin
-          config:
-            platform: linux
-            image_resource:
-              type: registry-image
-              source: {repository: golang}
-            inputs:
-              - name: compute-image-tools
-            outputs:
-              - name: build-darwin
-            params:
-              GOOS: darwin
-            run:
-              dir: compute-image-tools/cli_tools/gce_export
-              path: go  # path must be specified
-              args: ['build', '-v', '-o=../../../build-darwin/gce_export']
+      - task: gce-export-build-windows
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: {repository: golang}
+          inputs:
+            - name: compute-image-tools
+          outputs:
+            - name: build-windows
+          params:
+            GOOS: windows
+          run:
+            dir: compute-image-tools/cli_tools/gce_export
+            path: go  # path must be specified
+            args: ['build', '-v', '-o=../../../build-windows/gce_export']
+      - task: gce-export-build-linux
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: {repository: golang}
+          inputs:
+            - name: compute-image-tools
+          outputs:
+            - name: build-linux
+          params:
+            CGO_ENABLED: 0
+          run:
+            dir: compute-image-tools/cli_tools/gce_export
+            path: go  # path must be specified
+            args: ['build', '-v', '-o=../../../build-linux/gce_export']
+      - task: gce-export-build-darwin
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: {repository: golang}
+          inputs:
+            - name: compute-image-tools
+          outputs:
+            - name: build-darwin
+          params:
+            GOOS: darwin
+          run:
+            dir: compute-image-tools/cli_tools/gce_export
+            path: go  # path must be specified
+            args: ['build', '-v', '-o=../../../build-darwin/gce_export']
       - task: copy-binary
         config:
           platform: linux
@@ -251,49 +248,48 @@ jobs:
               - --context=compute-image-tools
               - --dockerfile=compute-image-tools/gce_export.Dockerfile
               - --no-push
-      - in_parallel:
-        - task: gce-export-push-gcs-linux
-          config:
-            platform: linux
-            image_resource:
-              type: registry-image
-              source: {repository: gcr.io/cloud-builders/gsutil}
-            inputs:
-              - name: build-linux
-              - name: creds
-            params:
-              GOOGLE_APPLICATION_CREDENTIALS: creds/credentials.json
-            run:
-              path: gsutil  # path must be specified
-              args: ['cp', 'build-linux/*', 'gs://gcp-guest/latest/linux/']
-        - task: gce-export-push-gcs-windows
-          config:
-            platform: linux
-            image_resource:
-              type: registry-image
-              source: {repository: gcr.io/cloud-builders/gsutil}
-            inputs:
-              - name: build-windows
-              - name: creds
-            params:
-              GOOGLE_APPLICATION_CREDENTIALS: creds/credentials.json
-            run:
-              path: gsutil  # path must be specified
-              args: ['cp', 'build-windows/*', 'gs://gcp-guest/latest/windows/']
-        - task: gce-export-push-gcs-darwin
-          config:
-            platform: linux
-            image_resource:
-              type: registry-image
-              source: {repository: gcr.io/cloud-builders/gsutil}
-            inputs:
-              - name: build-darwin
-              - name: creds
-            params:
-              GOOGLE_APPLICATION_CREDENTIALS: creds/credentials.json
-            run:
-              path: gsutil  # path must be specified
-              args: ['cp', 'build-darwin/*', 'gs://gcp-guest/latest/darwin/']
+      - task: gce-export-push-gcs-linux
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: {repository: gcr.io/cloud-builders/gsutil}
+          inputs:
+            - name: build-linux
+            - name: creds
+          params:
+            BOTO_CONFIG: creds/boto
+          run:
+            path: gsutil  # path must be specified
+            args: ['cp', 'build-linux/*', 'gs://gcp-guest/latest/linux/']
+      - task: gce-export-push-gcs-windows
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: {repository: gcr.io/cloud-builders/gsutil}
+          inputs:
+            - name: build-windows
+            - name: creds
+          params:
+            BOTO_CONFIG: creds/boto
+          run:
+            path: gsutil  # path must be specified
+            args: ['cp', 'build-windows/*', 'gs://gcp-guest/latest/windows/']
+      - task: gce-export-push-gcs-darwin
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source: {repository: gcr.io/cloud-builders/gsutil}
+          inputs:
+            - name: build-darwin
+            - name: creds
+          params:
+            BOTO_CONFIG: creds/boto
+          run:
+            path: gsutil  # path must be specified
+            args: ['cp', 'build-darwin/*', 'gs://gcp-guest/latest/darwin/']
   - name: import-precheck
     plan:
       - get: compute-image-tools
