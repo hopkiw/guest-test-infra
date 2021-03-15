@@ -13,7 +13,7 @@ outputs:
 - name: package-version
 
 run:
-  path: bash
+  path: ash
   args:
   - -exc
   - |
