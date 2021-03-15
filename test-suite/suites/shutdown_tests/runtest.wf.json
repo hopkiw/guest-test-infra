@@ -1,0 +1,81 @@
+{
+  "Name": "runtest",
+  "DefaultTimeout": "60m",
+  "Vars": {
+    "varname": {"Value": "varvalue"}
+  },
+  "Sources": {
+    "test": "./shutdown_tests.test"
+  },
+  "Steps": {
+    "setup": {
+      "CreateDisks": [
+        {
+          "Name": "disk-test",
+          "SourceImage": "debian-9",
+          "SourceImage": "projects/debian-cloud/global/images/family/debian-10",
+          "SizeGb": "50",
+          "Type": "pd-ssd"
+        }
+      ]
+    },
+    "run": {
+      "CreateInstances": [
+        {
+          "Name": "inst-shutdown-test",
+          "Disks": [{"Source": "disk-test"}],
+          "MachineType": "e2-standard-4",
+          "Metadata": {
+            "varname": "${varname}",
+            "shutdown-script": "#!/bin/bash\ncount=0\nwhile true; do\n  echo $count | tee /root/the_log > /dev/console\nsync\n((count++))\nsleep 1\ndone"
+          },
+          "Scopes": [
+            "https://www.googleapis.com/auth/devstorage.read_write"
+          ],
+          "StartupScript": "test"
+        }
+      ]
+    },
+    "wait1": {
+      "WaitForInstancesSignal": [
+        {
+          "Name": "inst-shutdown-test",
+          "SerialOutput": {
+            "Port": 1,
+            "SuccessMatch": "TestInterimSuccess:"
+          }
+        }
+      ]
+    },
+    "stop": {
+      "StopInstances": {
+        "Instances": ["inst-shutdown-test"]
+      }
+    },
+    "start": {
+      "StartInstances": {
+        "Instances": ["inst-shutdown-test"]
+      }
+    },
+    "wait2": {
+      "WaitForInstancesSignal": [
+        {
+          "Name": "inst-shutdown-test",
+          "SerialOutput": {
+            "Port": 1,
+            "FailureMatch": "TestFailed:",
+            "SuccessMatch": "TestSuccess:",
+            "StatusMatch": "TestStatus:"
+          }
+        }
+      ]
+    }
+  },
+  "Dependencies": {
+    "run": ["setup"],
+    "wait1": ["run"],
+    "stop": ["wait1"],
+    "start": ["stop"],
+    "wait2": ["start"]
+  }
+}
