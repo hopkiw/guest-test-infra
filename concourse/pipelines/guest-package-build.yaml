@@ -40,7 +40,7 @@ resources:
   type: git
   source:
     uri: https://github.com/hopkiw/guest-test-infra.git
-    branch: master
+    branch: inject_package
     fetch_tags: true
 
 jobs:
@@ -121,38 +121,38 @@ jobs:
       tag: package-version/version
       commitish: guest-agent/.git/ref
   - in_parallel:
-    fail_fast: true
-    steps:
-    - task: inject-guest-agent-deb9
-      file: guest-test-infra/concourse/tasks/gcloud-inject-package.yaml
-      vars:
-        package_path: "guest-agent/google-guest-agent_((.:package-version))-g1_amd64.deb"
-        universe: "cloud-apt"
-        repo: "google-guest-agent"
-    - task: inject-guest-agent-el7
-      file: guest-test-infra/concourse/tasks/gcloud-inject-package.yaml
-      vars:
-        package_path: "guest-agent/google-guest-agent-((.:package-version))-g1.el7.x86_64.rpm"
-        universe: "cloud-apt"
-        repo: "google-guest-agent"
-    - task: inject-guest-agent-el8
-      file: guest-test-infra/concourse/tasks/gcloud-inject-package.yaml
-      vars:
-        package_path: "guest-agent/google-guest-agent_((.:package-version))-g1.el8.x86_64.rpm"
-        universe: "cloud-apt"
-        repo: "google-guest-agent"
-    - task: inject-guest-agent-goo
-      file: guest-test-infra/concourse/tasks/gcloud-inject-package.yaml
-      vars:
-        package_path: "guest-agent/google-compute-engine-windows.x86_64.((.:package-version)).0@1.goo"
-        universe: "cloud-yuck"
-        repo: "google-compute-engine-windows"
-    - task: inject-guest-agent-metadata-goo
-      file: guest-test-infra/concourse/tasks/gcloud-inject-package.yaml
-      vars:
-        package_path: "guest-agent/google-compute-engine-metadata-scripts.x86_64.((.:package-version)).0@1.goo"
-        universe: "cloud-yuck"
-        repo: "google-compute-engine-metadata-scripts"
+      fail_fast: true
+      steps:
+      - task: inject-guest-agent-deb9
+        file: guest-test-infra/concourse/tasks/gcloud-inject-package.yaml
+        vars:
+          package_path: "guest-agent/google-guest-agent_((.:package-version))-g1_amd64.deb"
+          universe: "cloud-apt"
+          repo: "google-guest-agent"
+      - task: inject-guest-agent-el7
+        file: guest-test-infra/concourse/tasks/gcloud-inject-package.yaml
+        vars:
+          package_path: "guest-agent/google-guest-agent-((.:package-version))-g1.el7.x86_64.rpm"
+          universe: "cloud-apt"
+          repo: "google-guest-agent"
+      - task: inject-guest-agent-el8
+        file: guest-test-infra/concourse/tasks/gcloud-inject-package.yaml
+        vars:
+          package_path: "guest-agent/google-guest-agent_((.:package-version))-g1.el8.x86_64.rpm"
+          universe: "cloud-apt"
+          repo: "google-guest-agent"
+      - task: inject-guest-agent-goo
+        file: guest-test-infra/concourse/tasks/gcloud-inject-package.yaml
+        vars:
+          package_path: "guest-agent/google-compute-engine-windows.x86_64.((.:package-version)).0@1.goo"
+          universe: "cloud-yuck"
+          repo: "google-compute-engine-windows"
+      - task: inject-guest-agent-metadata-goo
+        file: guest-test-infra/concourse/tasks/gcloud-inject-package.yaml
+        vars:
+          package_path: "guest-agent/google-compute-engine-metadata-scripts.x86_64.((.:package-version)).0@1.goo"
+          universe: "cloud-yuck"
+          repo: "google-compute-engine-metadata-scripts"
 - name: build-guest-oslogin
   plan:
   - get: guest-oslogin
@@ -376,20 +376,3 @@ jobs:
       repo-name: "guest-configs"
       tag: ((.:package-version))
       sha: ((.:commit-sha))
-- name: inject-guest-agent-unstable
-  plan:
-  - get: guest-agent
-    passed: [build-guest-agent]
-    trigger: true
-    params:
-      skip_download: "true"
-  - get: guest-test-infra
-  - task: get-credential
-    file: guest-test-infra/concourse/tasks/get-credential.yaml
-  - task: inject-guest-agent-unstable
-    file: guest-test-infra/concourse/tasks/gcloud-inject-package.yaml
-    vars:
-      # TODO: this needs to come from somewhere
-      package_path: "guest-agent/google-guest-agent_20210315.00-g1_amd64.deb"
-      universe: cloud-apt
-      repo: google-guest-agent
