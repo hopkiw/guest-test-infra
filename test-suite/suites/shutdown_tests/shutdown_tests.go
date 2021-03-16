@@ -19,4 +19,7 @@ func setup() {
 	//
 	// or vm1.RunTests()
 	// or we can omit that, and it just sets a filter (ultimately a metadata key)
+	//
+	// skip might look like:
+	// test_helpers.AddSkipImages("ubuntu-*")  // these tests can't run on ubuntu
 }
