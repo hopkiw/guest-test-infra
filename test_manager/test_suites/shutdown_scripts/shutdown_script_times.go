@@ -1,4 +1,4 @@
-package shutdown_tests
+package shutdown_scripts
 
 import (
 	"fmt"

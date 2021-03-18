@@ -1,14 +1,30 @@
-package shutdown_tests
+package shutdown_scripts
 
-import "fmt"
+import (
+	"fmt"
 
-// This is where you write setup code, override defaults, etc.
-// You could maybe have a return value, or just optional package hooks for registering things?
-// Are you required to provide it, or do we use reflection to find out and if not, invoke a default?
-func setup() {
-	fmt.Printf("shutdown_tests: setup()")
-	//vm1 := test_helpers.CreateVM()
-	//vm1.SetShutdownScript(shutdownscript)
+	"github.com/GoogleCloudPlatform/guest-test-infra/test_manager/test_manager"
+)
+
+var (
+	Name           = "shutdown_scripts"
+	shutdownscript = `#!/bin/bash
+count=1
+while True; do
+  echo $count | tee -a /root/the_log
+  ((count++)
+  sleep 1
+done`
+)
+
+func TestSetup(t *test_manager.TestSuite) error {
+	fmt.Println("shutdown_scripts.TestSetup")
+	vm1, err := t.CreateTestVM("vm")
+	if err != nil {
+		return err
+	}
+	vm1.SetShutdownScript(shutdownscript)
+	return nil
 	// Do I then register this VM, or can CreateVM really be smart enough to figure out what I mean?
 	//
 	// or another example
