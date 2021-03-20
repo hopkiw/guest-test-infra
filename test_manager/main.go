@@ -1,8 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"io"
+	"log"
+	"os"
 
+	"github.com/GoogleCloudPlatform/guest-logging-go/logger"
 	"github.com/GoogleCloudPlatform/guest-test-infra/test_manager/test_manager"
 	"github.com/GoogleCloudPlatform/guest-test-infra/test_manager/test_suites/image_validation"
 	"github.com/GoogleCloudPlatform/guest-test-infra/test_manager/test_suites/oslogin"
@@ -10,7 +15,25 @@ import (
 	"github.com/GoogleCloudPlatform/guest-test-infra/test_manager/test_suites/ssh"
 )
 
+type logWriter struct {
+	log *log.Logger
+}
+
+func (l *logWriter) Write(b []byte) (int, error) {
+	l.log.Print(string(b))
+	return len(b), nil
+}
+
 func main() {
+	ctx := context.Background()
+
+	testLogger := log.New(os.Stdout, "[TestManager] ", 0)
+	testLogger.Println("Starting...")
+
+	// Initialize logger for any shared function calls.
+	opts := logger.LogOpts{LoggerName: "TestManager", Debug: true,
+		Writers: []io.Writer{&logWriter{log: testLogger}}, DisableCloudLogging: true, DisableLocalLogging: true}
+	logger.Init(ctx, opts)
 	// Normally this would be provided as an argument.
 	image := "projects/debian-cloud/global/images/family/debian-10"
 
