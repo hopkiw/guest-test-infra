@@ -2,17 +2,27 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"io"
+	"flag"
 	"log"
 	"os"
+	"strings"
 
-	"github.com/GoogleCloudPlatform/guest-logging-go/logger"
 	"github.com/GoogleCloudPlatform/guest-test-infra/test_manager/test_manager"
 	"github.com/GoogleCloudPlatform/guest-test-infra/test_manager/test_suites/image_validation"
 	"github.com/GoogleCloudPlatform/guest-test-infra/test_manager/test_suites/oslogin"
 	"github.com/GoogleCloudPlatform/guest-test-infra/test_manager/test_suites/shutdown_scripts"
 	"github.com/GoogleCloudPlatform/guest-test-infra/test_manager/test_suites/ssh"
+)
+
+var (
+	project       = flag.String("project", "", "project to be used for tests")
+	zone          = flag.String("zone", "", "zone to be used for tests")
+	print         = flag.Bool("print", false, "print out the parsed test workflows and exit")
+	validate      = flag.Bool("validate", false, "validate all the test workflows and exit")
+	filter        = flag.String("filter", "", "test suite name filter")
+	outPath       = flag.String("out_path", "junit.xml", "junit xml path")
+	images        = flag.String("images", "", "comma separated list of images to test")
+	parallelCount = flag.Int("parallel_count", 5, "TestParallelCount")
 )
 
 type logWriter struct {
@@ -24,76 +34,74 @@ func (l *logWriter) Write(b []byte) (int, error) {
 	return len(b), nil
 }
 
+// TODO: we need to marshall the final result of a run into a junitTestSuites
+//       object with summary values
+// TODO: we need to figure out logging, skips, failures in testsetup, etc.
+
+// main alone has the packages imported and can reference their TestSetup
+// functions.. even if it's only to register them.
 func main() {
 	ctx := context.Background()
+
+	// Setup logging.
 
 	testLogger := log.New(os.Stdout, "[TestManager] ", 0)
 	testLogger.Println("Starting...")
 
-	// Initialize logger for any shared function calls.
-	opts := logger.LogOpts{LoggerName: "TestManager", Debug: true,
-		Writers: []io.Writer{&logWriter{log: testLogger}}, DisableCloudLogging: true, DisableLocalLogging: true}
-	logger.Init(ctx, opts)
-	// Normally this would be provided as an argument.
-	image := "projects/debian-cloud/global/images/family/debian-10"
+	// TODO: this was copied from osconfig tests. Do we use anything that needs this?
+	//       I think this is for if any shared code does logging, we
+	//       control its format. I don't think we invoke any code that uses
+	//       guest-logging-go here, though.
+	/*
+		opts := logger.LogOpts{LoggerName: "TestManager-cl", Debug: true,
+			Writers: []io.Writer{&logWriter{log: testLogger}}, DisableCloudLogging: true, DisableLocalLogging: true}
+		logger.Init(ctx, opts)
+	*/
 
-	fmt.Println("test_manager: creating shutdown scripts test suite")
-	shutdown_scripts_testsuite := &test_manager.TestSuite{
-		Name:  shutdown_scripts.Name,
-		Image: image,
-	}
-	if err := shutdown_scripts.TestSetup(shutdown_scripts_testsuite); err != nil {
-		fmt.Printf("Got an error setting up %s: %v\n", shutdown_scripts_testsuite.Name, err)
-		shutdown_scripts_testsuite.Disable()
-	}
+	// Handle args.
 
-	fmt.Println("test_manager: creating image validation test suite")
-	image_validation_testsuite := &test_manager.TestSuite{
-		Name:  image_validation.Name,
-		Image: image,
-	}
-	if err := image_validation.TestSetup(image_validation_testsuite); err != nil {
-		fmt.Printf("Got an error setting up %s: %v\n", image_validation_testsuite.Name, err)
-		image_validation_testsuite.Disable()
+	flag.Parse()
+	if *project == "" || *zone == "" || *images == "" {
+		testLogger.Fatal("Must provide project, zone and images arguments")
+		return
 	}
 
-	fmt.Println("test_manager: creating oslogin test suite")
-	oslogin_testsuite := &test_manager.TestSuite{
-		Name:  oslogin.Name,
-		Image: image,
-	}
-	if err := oslogin.TestSetup(oslogin_testsuite); err != nil {
-		fmt.Printf("Got an error setting up %s: %v\n", oslogin_testsuite.Name, err)
-		oslogin_testsuite.Disable()
+	// Setup tests.
+
+	testPackages := []struct {
+		name      string
+		setupFunc func(*test_manager.TestSuite) error
+	}{
+		{
+			image_validation.Name,
+			image_validation.TestSetup,
+		},
+		{
+			oslogin.Name,
+			oslogin.TestSetup,
+		},
+		{
+			ssh.Name,
+			ssh.TestSetup,
+		},
+		{
+			shutdown_scripts.Name,
+			shutdown_scripts.TestSetup,
+		},
 	}
 
-	fmt.Println("test_manager: creating ssh test suite")
-	ssh_testsuite := &test_manager.TestSuite{
-		Name:  ssh.Name,
-		Image: image,
+	var testSuites []*test_manager.TestSuite
+	for _, testPackage := range testPackages {
+		for _, image := range strings.Split(*images, ",") {
+			ts := &test_manager.TestSuite{Name: testPackage.name, Image: image}
+			testSuites = append(testSuites, ts)
+			if err := testPackage.setupFunc(ts); err != nil {
+				testLogger.Printf("%s.TestSetup for %s failed: %v", testPackage.name, image, err)
+				ts.Disable()
+			}
+		}
 	}
-	if err := ssh.TestSetup(ssh_testsuite); err != nil {
-		fmt.Printf("Got an error setting up %s: %v\n", ssh_testsuite.Name, err)
-		ssh_testsuite.Disable()
-	}
 
-	fmt.Println("test_manager: Done with setup!")
-
-	test_manager.RunTests([]*test_manager.TestSuite{shutdown_scripts_testsuite, image_validation_testsuite, oslogin_testsuite, ssh_testsuite})
-
+	testLogger.Println("test_manager: Done with setup!")
+	test_manager.RunTests(ctx, testSuites, testLogger, *outPath, *project, *zone, *parallelCount)
 }
-
-/*
-func main() {
-	ts := &test_manager.TestSuite{Name: "fake", Image: "projects/debian-cloud/global/images/family/debian-10"}
-	// here's testsetup
-	vm, err := ts.CreateTestVM("testvm")
-	if err != nil {
-		panic(err)
-	}
-	vm.AddMetadata("mykey", "myvalue")
-	if err := test_manager.RunTests([]*test_manager.TestSuite{ts}); err != nil {
-		panic(err)
-	}
-}
-*/

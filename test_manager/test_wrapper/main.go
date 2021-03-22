@@ -27,6 +27,7 @@ const (
 
 func main() {
 	ctx := context.Background()
+	log.Printf("started test_wrapper")
 
 	client, err := storage.NewClient(ctx)
 	if err != nil {
@@ -35,56 +36,66 @@ func main() {
 
 	daisyOutsPath, err := utils.GetMetadataAttribute("daisy-outs-path")
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("couldnt determine daisy-outs-path: %v", err)
+		return
 	}
+	log.Printf("daisy-outs-path: %s", daisyOutsPath)
 
 	testRun, err := utils.GetMetadataAttribute("_test_run")
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("couldnt determine _test_run: %v", err)
+		testRun = ""
 	}
+	log.Printf("_test_run: %s", testRun)
 
-	testBinaryUrl, err := utils.GetMetadataAttribute("_test_binarypath")
+	testBinaryURL, err := utils.GetMetadataAttribute("_test_binarypath")
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("couldnt determine _test_binarypath: %v", err)
+		return
 	}
-
-	u, err := url.Parse(testBinaryUrl)
-	if err != nil {
-		log.Fatalf("Failed to parse GCS url: %v\n", err)
-	}
-	bucket, object := u.Host, u.Path
+	log.Printf("_test_binarypath: %s", testBinaryURL)
 
 	var testArguments = []string{"-test.v"}
 	if testRun != "" {
 		testArguments = append(testArguments, "-test.run", testRun)
 	}
+	log.Printf("test arguments: %v", testArguments)
 
 	workDir, err := mkWorkDir()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("couldnt make working dir: %v", err)
+		return
 	}
+	log.Printf("working dir: %v", workDir)
 
-	if err := downloadGCSObject(ctx, client, bucket, object, workDir+testBinaryLocalPath); err != nil {
-		log.Fatalf("Failed to download object: %v\n", err)
+	if err := downloadGCSObject(ctx, client, testBinaryURL, workDir+testBinaryLocalPath); err != nil {
+		log.Fatalf("Failed to download object %s: %v\n", testBinaryURL, err)
+		return
 	}
 
 	if err := os.Chdir(workDir); err != nil {
-		log.Fatal(err)
+		log.Fatalf("couldnt cd to working dir: %v", err)
+		return
 	}
 
 	testOutput, err := exec.Command(workDir+testBinaryLocalPath, testArguments...).Output()
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("command returned error or failed to run: %v", err)
 	}
+	log.Printf("got test output:\n%s\n", testOutput)
 
 	testData, err := convertToJunit(string(testOutput))
 	if err != nil {
 		log.Fatalf("Failed to convert to junit format: %v\n", err)
+		return
 	}
+	log.Printf("junit formatted output:\n%s\n", testData)
 
-	if err := uploadResult(ctx, client, daisyOutsPath+testResult, testData); err != nil {
+	if err := uploadResult(ctx, client, daisyOutsPath+"/"+testResult, testData); err != nil {
 		log.Fatalf("Failed to upload test result: %v\n", err)
 	}
+	log.Printf("uploaded result to %s", daisyOutsPath+"/"+testResult)
+	log.Printf("MAGIC-STRING: done!")
 }
 
 func mkWorkDir() (string, error) {
@@ -107,8 +118,12 @@ func convertToJunit(input string) (*bytes.Buffer, error) {
 	return &b, nil
 }
 
-func downloadGCSObject(ctx context.Context, client *storage.Client, bucket, object, file string) error {
-	rc, err := client.Bucket(bucket).Object(object).NewReader(ctx)
+func downloadGCSObject(ctx context.Context, client *storage.Client, gcsPath, file string) error {
+	u, err := url.Parse(gcsPath)
+	if err != nil {
+		log.Fatalf("Failed to parse GCS url: %v\n", err)
+	}
+	rc, err := client.Bucket(u.Host).Object(u.Path[1:]).NewReader(ctx)
 	if err != nil {
 		return err
 	}
@@ -127,10 +142,10 @@ func downloadGCSObject(ctx context.Context, client *storage.Client, bucket, obje
 
 func uploadResult(ctx context.Context, client *storage.Client, path string, data io.Reader) error {
 	u, err := url.Parse(path)
-	if err != nil {
+	if err != nil || u.Path == "" {
 		log.Fatalf("Failed to parse URL: %v\n", err)
 	}
-	des := client.Bucket(u.Host).Object(u.Path).NewWriter(ctx)
+	des := client.Bucket(u.Host).Object(u.Path[1:]).NewWriter(ctx)
 	if _, err := io.Copy(des, data); err != nil {
 		return fmt.Errorf("Failed to write file: %v", err)
 	}

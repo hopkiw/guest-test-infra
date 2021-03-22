@@ -24,14 +24,12 @@ type TestVM struct {
 // created if it doesn't exist. The first VM created has a WaitInstances step
 // configured.
 func (t *TestSuite) CreateTestVM(name string) (*TestVM, error) {
-	name = "testvm"
 	testVM := &TestVM{name: name, testSuite: t}
 
 	if t.wf == nil {
 		t.wf = daisy.New()
 		t.wf.Name = t.Name
-		t.wf.Project = "liamh-testing"
-		t.wf.Zone = "us-west1-b"
+		fmt.Printf("I'm creating the workflow with name %s\n", t.wf.Name)
 		if err := t.createFirstTestVM(name); err != nil {
 			return nil, err
 		}
@@ -93,7 +91,11 @@ func (t *TestSuite) createFirstTestVM(name string) error {
 
 	instanceSignal := &daisy.InstanceSignal{}
 	instanceSignal.Name = name
-	instanceSignal.Stopped = true
+	//instanceSignal.Stopped = true
+	serialOutput := &daisy.SerialOutput{}
+	serialOutput.Port = 1
+	serialOutput.SuccessMatch = "MAGIC-STRING"
+	instanceSignal.SerialOutput = serialOutput
 	waitForInstances := &daisy.WaitForInstancesSignal{instanceSignal}
 
 	waitStep, err := t.wf.NewStep("wait-" + name)
@@ -103,6 +105,18 @@ func (t *TestSuite) createFirstTestVM(name string) error {
 	waitStep.WaitForInstancesSignal = waitForInstances
 
 	t.wf.AddDependency(waitStep, createVMStep)
+
+	copyGCSObject := daisy.CopyGCSObject{}
+	copyGCSObject.Source = "${OUTSPATH}/junit.xml"
+	copyGCSObject.Destination = "gs://liamh-export/test_new_test_manager/0001/" + t.Name + "/junit.xml"
+	copyGCSObjects := &daisy.CopyGCSObjects{copyGCSObject}
+	copyStep, err := t.wf.NewStep("copy-objects")
+	if err != nil {
+		return err
+	}
+	copyStep.CopyGCSObjects = copyGCSObjects
+
+	t.wf.AddDependency(copyStep, waitStep)
 
 	return nil
 }

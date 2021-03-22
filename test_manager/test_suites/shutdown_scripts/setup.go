@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	Name           = "shutdown_scripts"
+	Name           = "shutdown-scripts"
 	shutdownscript = `#!/bin/bash
 count=1
 while True; do
@@ -18,7 +18,7 @@ done`
 )
 
 func TestSetup(t *test_manager.TestSuite) error {
-	fmt.Println("shutdown_scripts.TestSetup")
+	fmt.Println("shutdown-scripts.TestSetup")
 	vm1, err := t.CreateTestVM("vm")
 	if err != nil {
 		return err

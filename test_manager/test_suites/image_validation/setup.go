@@ -6,9 +6,9 @@ import (
 	"github.com/GoogleCloudPlatform/guest-test-infra/test_manager/test_manager"
 )
 
-var Name = "image_validation"
+var Name = "image-validation"
 
 func TestSetup(t *test_manager.TestSuite) error {
-	fmt.Println("image_validation.TestSetup")
+	fmt.Println("image-validation.TestSetup")
 	return test_manager.SingleVMTest(t)
 }
