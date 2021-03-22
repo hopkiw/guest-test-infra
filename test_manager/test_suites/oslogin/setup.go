@@ -2,14 +2,15 @@ package oslogin
 
 import (
 	"errors"
-	"fmt"
 
-	"github.com/GoogleCloudPlatform/guest-test-infra/test_manager/test_manager"
+	"github.com/GoogleCloudPlatform/guest-test-infra/test_manager/testmanager"
 )
 
 var Name = "oslogin"
 
-func TestSetup(t *test_manager.TestSuite) error {
-	fmt.Println("oslogin.TestSetup")
-	return errors.New("dummy error")
+func TestSetup(t *testmanager.TestWorkflow) error {
+	if t.Image == "centos-7" {
+		return errors.New("dummy error")
+	}
+	return testmanager.SingleVMTest(t)
 }

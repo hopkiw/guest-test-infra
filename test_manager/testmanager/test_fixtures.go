@@ -1,4 +1,4 @@
-package test_manager
+package testmanager
 
 import (
 	"fmt"
@@ -8,29 +8,28 @@ import (
 )
 
 // SingleVMTest configures the simple test case of one VM running the test
-// suite.
-func SingleVMTest(t *TestSuite) error {
+// package.
+func SingleVMTest(t *TestWorkflow) error {
 	_, err := t.CreateTestVM(t.Name)
 	return err
 }
 
 // TestVM is a test VM.
 type TestVM struct {
-	name      string
-	testSuite *TestSuite
+	name         string
+	testWorkflow *TestWorkflow
 }
 
 // CreateTestVM adds steps to a workflow to create a test VM. The workflow is
 // created if it doesn't exist. The first VM created has a WaitInstances step
 // configured.
-func (t *TestSuite) CreateTestVM(name string) (*TestVM, error) {
-	testVM := &TestVM{name: name, testSuite: t}
+func (t *TestWorkflow) CreateTestVM(name string) (*TestVM, error) {
+	testVM := &TestVM{name: name, testWorkflow: t}
 
 	if t.wf == nil {
 		t.wf = daisy.New()
 		t.wf.Name = t.Name
-		fmt.Printf("I'm creating the workflow with name %s\n", t.wf.Name)
-		if err := t.createFirstTestVM(name); err != nil {
+		if err := t.setupBaseWorkflow(name); err != nil {
 			return nil, err
 		}
 		return testVM, nil
@@ -57,7 +56,8 @@ func (t *TestSuite) CreateTestVM(name string) (*TestVM, error) {
 	return testVM, nil
 }
 
-func (t *TestSuite) createFirstTestVM(name string) error {
+// TODO: break these two into smaller functions and add unit tests.
+func (t *TestWorkflow) setupBaseWorkflow(name string) error {
 	bootdisk := &daisy.Disk{}
 	bootdisk.Name = name
 	bootdisk.SourceImage = t.Image
@@ -91,6 +91,7 @@ func (t *TestSuite) createFirstTestVM(name string) error {
 
 	instanceSignal := &daisy.InstanceSignal{}
 	instanceSignal.Name = name
+	// TODO: implement waiting on guest attributes in daisy.
 	//instanceSignal.Stopped = true
 	serialOutput := &daisy.SerialOutput{}
 	serialOutput.Port = 1
@@ -108,7 +109,6 @@ func (t *TestSuite) createFirstTestVM(name string) error {
 
 	copyGCSObject := daisy.CopyGCSObject{}
 	copyGCSObject.Source = "${OUTSPATH}/junit.xml"
-	copyGCSObject.Destination = "gs://liamh-export/test_new_test_manager/0001/" + t.Name + "/junit.xml"
 	copyGCSObjects := &daisy.CopyGCSObjects{copyGCSObject}
 	copyStep, err := t.wf.NewStep("copy-objects")
 	if err != nil {
@@ -123,7 +123,7 @@ func (t *TestSuite) createFirstTestVM(name string) error {
 
 // AddMetadata adds the specified key:value pair to metadata during VM creation.
 func (t *TestVM) AddMetadata(key, value string) {
-	createVMStep := t.testSuite.wf.Steps["create-vms"]
+	createVMStep := t.testWorkflow.wf.Steps["create-vms"]
 	for _, vm := range createVMStep.CreateInstances.Instances {
 		if vm.Name == t.name {
 			if vm.Metadata == nil {
@@ -135,8 +135,18 @@ func (t *TestVM) AddMetadata(key, value string) {
 	}
 }
 
-// RunTests runs only the named tests on the testVM. `runtest` must match the
-// parameter to `go test -run`
+// RunTests runs only the named tests on the testVM.
+//
+//    -run regexp
+//     Run only those tests and examples matching the regular expression.
+//     For tests, the regular expression is split by unbracketed slash (/)
+//     characters into a sequence of regular expressions, and each part
+//     of a test's identifier must match the corresponding element in
+//     the sequence, if any. Note that possible parents of matches are
+//     run too, so that -run=X/Y matches and runs and reports the result
+//     of all tests matching X, even those without sub-tests matching Y,
+//     because it must run them to look for those sub-tests.
+
 func (t *TestVM) RunTests(runtest string) {
 	t.AddMetadata("_test_run", runtest)
 }
@@ -155,7 +165,7 @@ func (t *TestVM) SetStartupScript(script string) {
 // the first created VM automatically has a wait step created. It is an error
 // to call this function on the first VM in a workflow.
 func (t *TestVM) AddWait(success, failure, status string, stopped bool) error {
-	if _, ok := t.testSuite.wf.Steps["wait-"+t.name]; ok {
+	if _, ok := t.testWorkflow.wf.Steps["wait-"+t.name]; ok {
 		return fmt.Errorf("wait step already exists for TestVM %q", t.name)
 	}
 	instanceSignal := &daisy.InstanceSignal{}
@@ -172,11 +182,11 @@ func (t *TestVM) AddWait(success, failure, status string, stopped bool) error {
 		instanceSignal.SerialOutput.FailureMatch = append(instanceSignal.SerialOutput.FailureMatch, failure)
 	}
 	waitForInstances := &daisy.WaitForInstancesSignal{instanceSignal}
-	s, err := t.testSuite.wf.NewStep("wait-" + t.name)
+	s, err := t.testWorkflow.wf.NewStep("wait-" + t.name)
 	if err != nil {
 		return err
 	}
 	s.WaitForInstancesSignal = waitForInstances
-	t.testSuite.wf.AddDependency(s, t.testSuite.wf.Steps["create-vms"])
+	t.testWorkflow.wf.AddDependency(s, t.testWorkflow.wf.Steps["create-vms"])
 	return nil
 }

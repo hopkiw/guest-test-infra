@@ -1,9 +1,7 @@
 package shutdown_scripts
 
 import (
-	"fmt"
-
-	"github.com/GoogleCloudPlatform/guest-test-infra/test_manager/test_manager"
+	"github.com/GoogleCloudPlatform/guest-test-infra/test_manager/testmanager"
 )
 
 var (
@@ -17,25 +15,11 @@ while True; do
 done`
 )
 
-func TestSetup(t *test_manager.TestSuite) error {
-	fmt.Println("shutdown-scripts.TestSetup")
+func TestSetup(t *testmanager.TestWorkflow) error {
 	vm1, err := t.CreateTestVM("vm")
 	if err != nil {
 		return err
 	}
 	vm1.SetShutdownScript(shutdownscript)
 	return nil
-	// Do I then register this VM, or can CreateVM really be smart enough to figure out what I mean?
-	//
-	// or another example
-	// vm1 := test_helpers.CreateVM()
-	// vm2 := test_helpers.CreateVM()
-	// vm1.RunTests("TestXxx,TestZzz")
-	// vm2.RunTests("TestYyy")
-	//
-	// or vm1.RunTests()
-	// or we can omit that, and it just sets a filter (ultimately a metadata key)
-	//
-	// skip might look like:
-	// test_helpers.AddSkipImages("ubuntu-*")  // these tests can't run on ubuntu
 }
