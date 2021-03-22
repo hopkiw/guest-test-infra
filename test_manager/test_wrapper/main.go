@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"math/rand"
 	"net/url"
@@ -68,7 +67,7 @@ func main() {
 	}
 	log.Printf("working dir: %v", workDir)
 
-	if err := downloadGCSObject(ctx, client, testBinaryURL, workDir+testBinaryLocalPath); err != nil {
+	if err := utils.DownloadGCSObjectToFile(ctx, client, testBinaryURL, workDir+testBinaryLocalPath); err != nil {
 		log.Fatalf("Failed to download object %s: %v\n", testBinaryURL, err)
 		return
 	}
@@ -116,28 +115,6 @@ func convertToJunit(input string) (*bytes.Buffer, error) {
 		return nil, err
 	}
 	return &b, nil
-}
-
-func downloadGCSObject(ctx context.Context, client *storage.Client, gcsPath, file string) error {
-	u, err := url.Parse(gcsPath)
-	if err != nil {
-		log.Fatalf("Failed to parse GCS url: %v\n", err)
-	}
-	rc, err := client.Bucket(u.Host).Object(u.Path[1:]).NewReader(ctx)
-	if err != nil {
-		return err
-	}
-	defer rc.Close()
-
-	data, err := ioutil.ReadAll(rc)
-	if err != nil {
-		return err
-	}
-
-	if err = ioutil.WriteFile(file, data, 0755); err != nil {
-		return err
-	}
-	return nil
 }
 
 func uploadResult(ctx context.Context, client *storage.Client, path string, data io.Reader) error {

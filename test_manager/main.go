@@ -19,10 +19,14 @@ var (
 	zone          = flag.String("zone", "", "zone to be used for tests")
 	printwf       = flag.Bool("print", false, "print out the parsed test workflows and exit")
 	validate      = flag.Bool("validate", false, "validate all the test workflows and exit")
-	filter        = flag.String("filter", "", "test name filter")
 	outPath       = flag.String("out_path", "junit.xml", "junit xml path")
 	images        = flag.String("images", "", "comma separated list of images to test")
 	parallelCount = flag.Int("parallel_count", 5, "TestParallelCount")
+	// TODO:
+	//filter        = flag.String("filter", "", "test name filter")
+	// TODO:
+	//ce            = flag.String("compute_endpoint_override", "", "API endpoint to override default, will override ComputeEndpoint in template")
+
 )
 
 type logWriter struct {
@@ -38,6 +42,15 @@ func (l *logWriter) Write(b []byte) (int, error) {
 //       object with summary values
 //
 // TODO: we need to figure out logging, skips, failures in testsetup, etc.
+//
+// TODO: multiple (locking) projects, multiple zones
+//
+// TODO: multiple VMs will upload same junit.xml - should multi VMs be given test code? can we 'merge'?
+//
+// TODO: rebooting VMs will 'overwrite' their own junit.xml
+//       maybe a test fixture 'nosave' which just touches a 'nosave' file in your working dir
+//       wrapper sees nosave, doesnt save. still sets markers
+//       if a whole VM is never going to save, we can do it with a TestVM method, setting metadata
 //
 
 func main() {
@@ -78,11 +91,11 @@ func main() {
 			// there anything for the workflow we can do before
 			// receiving the vm name? Will there ever be?
 			// ts := testmanager.NewTestWorkflow(testPackage.Name, image)
-			ts := &testmanager.TestWorkflow{Name: testPackage.name, Image: image}
-			testWorkflows = append(testWorkflows, ts)
-			if err := testPackage.setupFunc(ts); err != nil {
+			test := &testmanager.TestWorkflow{Name: testPackage.name, Image: image}
+			testWorkflows = append(testWorkflows, test)
+			if err := testPackage.setupFunc(test); err != nil {
 				log.Printf("%s.TestSetup for %s failed: %v", testPackage.name, image, err)
-				ts.Disable()
+				test.Disable()
 			}
 		}
 	}

@@ -34,6 +34,7 @@ type TestWorkflow struct {
 }
 
 // TODO: remove this testing method
+
 func (t *TestWorkflow) String() string {
 	b, err := json.MarshalIndent(t.wf, "", "  ")
 	if err != nil {
@@ -44,6 +45,8 @@ func (t *TestWorkflow) String() string {
 }
 
 // TODO: remove this testing method
+
+// Disable disables a workflow.
 func (t *TestWorkflow) Disable() {
 	t.wf = nil
 }
@@ -87,7 +90,7 @@ func finalizeWorkflows(tests []*TestWorkflow, zone, project string) {
 	}
 }
 
-type TestResult struct {
+type testResult struct {
 	testWorkflow                    *TestWorkflow
 	Skipped, FailedSetup            bool
 	WorkflowFailed, WorkflowSuccess bool
@@ -103,8 +106,8 @@ func getTestResults(ctx context.Context, ts *TestWorkflow) (string, error) {
 	return string(junit), nil
 }
 
-func runTestWorkflow(ctx context.Context, test *TestWorkflow) TestResult {
-	var res TestResult
+func runTestWorkflow(ctx context.Context, test *TestWorkflow) testResult {
+	var res testResult
 	res.testWorkflow = test
 	if test.skipped {
 		res.Skipped = true
@@ -115,10 +118,9 @@ func runTestWorkflow(ctx context.Context, test *TestWorkflow) TestResult {
 		return res
 	}
 	// TODO: remove this debug line
-	// only now do i notice i got the ID before populate..
 	fmt.Printf("runTestWorkflow: running %s on %s (ID %s)\n", test.Name, test.Image, test.wf.ID())
-	test.wf.Print(ctx)
 	/*
+		test.wf.Print(ctx)
 		if err := test.wf.Run(ctx); err != nil {
 			res.WorkflowFailed = true
 			res.Result = err.Error()
@@ -137,6 +139,7 @@ func runTestWorkflow(ctx context.Context, test *TestWorkflow) TestResult {
 	return res
 }
 
+// PrintTests prints all test workflows.
 func PrintTests(ctx context.Context, testWorkflows []*TestWorkflow, project, zone string) {
 	finalizeWorkflows(testWorkflows, zone, project)
 	for _, test := range testWorkflows {
@@ -144,6 +147,7 @@ func PrintTests(ctx context.Context, testWorkflows []*TestWorkflow, project, zon
 	}
 }
 
+// ValidateTests validates all test workflows.
 func ValidateTests(ctx context.Context, testWorkflows []*TestWorkflow, project, zone string) error {
 	finalizeWorkflows(testWorkflows, zone, project)
 	for _, test := range testWorkflows {
@@ -154,6 +158,7 @@ func ValidateTests(ctx context.Context, testWorkflows []*TestWorkflow, project, 
 	return nil
 }
 
+// RunTests runs all test workflows.
 func RunTests(ctx context.Context, testWorkflows []*TestWorkflow, outPath, project, zone string, parallelCount int) {
 	var err error
 	client, err = storage.NewClient(ctx)
@@ -162,7 +167,7 @@ func RunTests(ctx context.Context, testWorkflows []*TestWorkflow, outPath, proje
 	}
 	finalizeWorkflows(testWorkflows, zone, project)
 
-	testResults := make(chan TestResult, len(testWorkflows))
+	testResults := make(chan testResult, len(testWorkflows))
 	testchan := make(chan *TestWorkflow, len(testWorkflows))
 
 	var wg sync.WaitGroup
@@ -186,7 +191,7 @@ func RunTests(ctx context.Context, testWorkflows []*TestWorkflow, outPath, proje
 	}
 }
 
-func parseResult(res TestResult) {
+func parseResult(res testResult) {
 	switch {
 	case res.FailedSetup:
 		fmt.Printf("test %s on %s failed during setup and was disabled\n", res.testWorkflow.Name, res.testWorkflow.Image)
