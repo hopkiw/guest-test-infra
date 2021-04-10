@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/guest-test-infra/test_manager/utils"
+	"github.com/GoogleCloudPlatform/guest-test-infra/cloud_image_tests/utils"
 )
 
 func TestXxx(t *testing.T) {

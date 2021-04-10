@@ -7,11 +7,11 @@ import (
 	"log"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/guest-test-infra/test_manager/test_suites/image_validation"
-	"github.com/GoogleCloudPlatform/guest-test-infra/test_manager/test_suites/oslogin"
-	"github.com/GoogleCloudPlatform/guest-test-infra/test_manager/test_suites/shutdown_scripts"
-	"github.com/GoogleCloudPlatform/guest-test-infra/test_manager/test_suites/ssh"
-	"github.com/GoogleCloudPlatform/guest-test-infra/test_manager/testmanager"
+	"github.com/GoogleCloudPlatform/guest-test-infra/cloud_image_tests/test_suites/image_validation"
+	"github.com/GoogleCloudPlatform/guest-test-infra/cloud_image_tests/test_suites/oslogin"
+	"github.com/GoogleCloudPlatform/guest-test-infra/cloud_image_tests/test_suites/shutdown_scripts"
+	"github.com/GoogleCloudPlatform/guest-test-infra/cloud_image_tests/test_suites/ssh"
+	"github.com/GoogleCloudPlatform/guest-test-infra/cloud_image_tests/testmanager"
 )
 
 var (

@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	minimumSeconds = 210
+	minimumSeconds = 110
 )
 
 func parseFile() error {

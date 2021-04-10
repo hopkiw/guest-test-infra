@@ -4,7 +4,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/guest-test-infra/test_manager/testmanager"
+	"github.com/GoogleCloudPlatform/guest-test-infra/cloud_image_tests/testmanager"
 )
 
 var Name = "oslogin"

@@ -1,8 +1,6 @@
 package ssh
 
-import (
-	"github.com/GoogleCloudPlatform/guest-test-infra/test_manager/testmanager"
-)
+import "github.com/GoogleCloudPlatform/guest-test-infra/cloud_image_tests/testmanager"
 
 var Name = "ssh"
 
