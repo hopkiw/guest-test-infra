@@ -1,6 +1,6 @@
 package shutdown_scripts
 
-import "github.com/GoogleCloudPlatform/guest-test-infra/cloud_image_tests/testmanager"
+import "github.com/GoogleCloudPlatform/guest-test-infra/imagetest"
 
 var (
 	Name           = "shutdown-scripts"
@@ -15,7 +15,7 @@ done`
 	timerfile = "/root/the_log"
 )
 
-func TestSetup(t *testmanager.TestWorkflow) error {
+func TestSetup(t *imagetest.TestWorkflow) error {
 	vm1, err := t.CreateTestVM("vm")
 	if err != nil {
 		return err

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/guest-test-infra/cloud_image_tests/utils"
+	"github.com/GoogleCloudPlatform/guest-test-infra/imagetest/utils"
 )
 
 func TestHostname(t *testing.T) {

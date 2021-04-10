@@ -7,11 +7,11 @@ import (
 	"log"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/guest-test-infra/cloud_image_tests/test_suites/image_validation"
-	"github.com/GoogleCloudPlatform/guest-test-infra/cloud_image_tests/test_suites/oslogin"
-	"github.com/GoogleCloudPlatform/guest-test-infra/cloud_image_tests/test_suites/shutdown_scripts"
-	"github.com/GoogleCloudPlatform/guest-test-infra/cloud_image_tests/test_suites/ssh"
-	"github.com/GoogleCloudPlatform/guest-test-infra/cloud_image_tests/testmanager"
+	"github.com/GoogleCloudPlatform/guest-test-infra/imagetest"
+	"github.com/GoogleCloudPlatform/guest-test-infra/imagetest/testsuites/image_validation"
+	"github.com/GoogleCloudPlatform/guest-test-infra/imagetest/testsuites/oslogin"
+	"github.com/GoogleCloudPlatform/guest-test-infra/imagetest/testsuites/shutdown_scripts"
+	"github.com/GoogleCloudPlatform/guest-test-infra/imagetest/testsuites/ssh"
 )
 
 var (
@@ -63,7 +63,7 @@ func main() {
 	// Setup tests.
 	testPackages := []struct {
 		name      string
-		setupFunc func(*testmanager.TestWorkflow) error
+		setupFunc func(*imagetest.TestWorkflow) error
 	}{
 		{
 			image_validation.Name,
@@ -83,14 +83,14 @@ func main() {
 		},
 	}
 
-	var testWorkflows []*testmanager.TestWorkflow
+	var testWorkflows []*imagetest.TestWorkflow
 	for _, testPackage := range testPackages {
 		for _, image := range strings.Split(*images, ",") {
 			// Would it make more sense to instantiate base
 			// workflow here with a NewWorkflow function? Or is
 			// there anything for the workflow we can do before
 			// receiving the vm name? Will there ever be?
-			test, err := testmanager.NewTestWorkflow(testPackage.name, image)
+			test, err := imagetest.NewTestWorkflow(testPackage.name, image)
 			if err != nil {
 				log.Fatalf("Failed to create test workflow: %v", err)
 			}
@@ -102,21 +102,21 @@ func main() {
 		}
 	}
 
-	log.Println("testmanager: Done with setup")
+	log.Println("image tests: Done with setup")
 
 	ctx := context.Background()
 
 	if *printwf {
-		testmanager.PrintTests(ctx, testWorkflows, *project, *zone)
+		imagetest.PrintTests(ctx, testWorkflows, *project, *zone)
 		return
 	}
 
 	if *validate {
-		if err := testmanager.ValidateTests(ctx, testWorkflows, *project, *zone); err != nil {
+		if err := imagetest.ValidateTests(ctx, testWorkflows, *project, *zone); err != nil {
 			fmt.Printf("Validate failed: %v\n", err)
 		}
 		return
 	}
 
-	testmanager.RunTests(ctx, testWorkflows, *outPath, *project, *zone, *parallelCount)
+	imagetest.RunTests(ctx, testWorkflows, *outPath, *project, *zone, *parallelCount)
 }

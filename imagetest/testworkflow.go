@@ -1,4 +1,4 @@
-package testmanager
+package imagetest
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 
 	"cloud.google.com/go/storage"
 	"github.com/GoogleCloudPlatform/compute-image-tools/daisy"
-	"github.com/GoogleCloudPlatform/guest-test-infra/cloud_image_tests/utils"
+	"github.com/GoogleCloudPlatform/guest-test-infra/imagetest/utils"
 	junitFormatter "github.com/jstemmer/go-junit-report/formatter"
 	"google.golang.org/api/compute/v1"
 )
