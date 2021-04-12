@@ -2,6 +2,7 @@ package imagetest
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/GoogleCloudPlatform/compute-image-tools/daisy"
 )
@@ -14,31 +15,33 @@ const (
 
 // SingleVMTest configures one VM running tests.
 func SingleVMTest(t *TestWorkflow) error {
-	_, err := t.CreateTestVM(t.Name)
+	_, err := t.CreateTestVM("vm")
 	return err
-}
-
-// Disable disables a workflow.
-func (t *TestWorkflow) Disable() {
-	t.wf = nil
 }
 
 // Skip marks a test workflow to be skipped.
 func (t *TestWorkflow) Skip(message string) {
 	t.skipped = true
+	t.skippedMessage = message
+}
+
+func (t *TestWorkflow) SkippedMessage() string {
+	return t.skippedMessage
 }
 
 // CreateTestVM creates the necessary steps to create a VM with the specified name to the workflow.
 func (t *TestWorkflow) CreateTestVM(name string) (*TestVM, error) {
+	// TODO: more robust name validation.
+	name = strings.ReplaceAll(name, "_", "-")
 
-	createDisksStep, err := t.addCreateDisksStep(name)
+	createDisksStep, err := t.appendCreateDisksStep(name)
 	if err != nil {
 		return nil, err
 	}
 
 	// createDisksStep doesn't depend on any other steps.
 
-	createVMStep, err := t.addCreateVMStep(name)
+	createVMStep, err := t.appendCreateVMStep(name)
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +50,7 @@ func (t *TestWorkflow) CreateTestVM(name string) (*TestVM, error) {
 		return nil, err
 	}
 
-	waitStep, err := t.addWaitStep("wait-vm-"+name, name, false)
+	waitStep, err := t.addWaitStep(name, name, false)
 	if err != nil {
 		return nil, err
 	}
@@ -109,12 +112,13 @@ func (t *TestVM) SetStartupScript(script string) {
 // Reboot stops the VM, waits for it to shutdown, then starts it again. Your
 // test package must handle being run twice.
 func (t *TestVM) Reboot() error {
-	waitStep, ok := t.testWorkflow.wf.Steps["wait-vm-"+t.name]
+	// Grab the wait step that was added with CreateTestVM.
+	waitStep, ok := t.testWorkflow.wf.Steps["wait-"+t.name]
 	if !ok {
-		return fmt.Errorf("wait-vm-%s step missing", t.name)
+		return fmt.Errorf("wait-%s step missing", t.name)
 	}
 
-	stopInstancesStep, err := t.testWorkflow.addStopStep("stop-"+t.name, t.name)
+	stopInstancesStep, err := t.testWorkflow.addStopStep(t.name, t.name)
 	if err != nil {
 		return err
 	}
@@ -123,7 +127,7 @@ func (t *TestVM) Reboot() error {
 		return err
 	}
 
-	waitStopStep, err := t.testWorkflow.addWaitStep("wait-stopped-"+t.name, t.name, true)
+	waitStopStep, err := t.testWorkflow.addWaitStep("stopped-"+t.name, t.name, true)
 	if err != nil {
 		return err
 	}
@@ -132,7 +136,7 @@ func (t *TestVM) Reboot() error {
 		return err
 	}
 
-	startInstancesStep, err := t.testWorkflow.addStartStep("start-"+t.name, t.name)
+	startInstancesStep, err := t.testWorkflow.addStartStep(t.name, t.name)
 	if err != nil {
 		return err
 	}
@@ -141,7 +145,7 @@ func (t *TestVM) Reboot() error {
 		return err
 	}
 
-	waitStartedStep, err := t.testWorkflow.addWaitStep("wait-started-"+t.name, t.name, false)
+	waitStartedStep, err := t.testWorkflow.addWaitStep("started-"+t.name, t.name, false)
 	if err != nil {
 		return err
 	}
