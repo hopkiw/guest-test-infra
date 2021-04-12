@@ -1,0 +1,22 @@
+{
+  "Name": "image-validation",
+  "Project": "liamh-testing",
+  "Zone": "us-west1-b",
+  "Steps": {
+    "copy-objects": {
+      "Timeout": "10m",
+      "CopyGCSObjects": [
+        {
+          "Source": "gs://liamh-export/output-from-test-manager/2021-04-11T01:52:38-07:00/image_validation/debian-10/daisy-image-validation-20210411-08:52:38-xgb4x/outs/",
+          "Destination": "gs://liamh-export/output-from-test-manager/2021-04-11T01:52:38-07:00/image_validation/debian-10/outs"
+        }
+
+      ]
+    }
+  },
+  "Dependencies": {
+    "copy-objects": []
+  },
+  "DefaultTimeout": "10m",
+  "ForceCleanupOnError": false
+}

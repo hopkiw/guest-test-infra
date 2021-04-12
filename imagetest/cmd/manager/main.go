@@ -9,6 +9,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/guest-test-infra/imagetest"
 	imagevalidation "github.com/GoogleCloudPlatform/guest-test-infra/imagetest/test_suites/image_validation"
+	"github.com/GoogleCloudPlatform/guest-test-infra/imagetest/test_suites/ssh"
 )
 
 var (
@@ -46,6 +47,10 @@ func main() {
 			imagevalidation.Name,
 			imagevalidation.TestSetup,
 		},
+		{
+			ssh.Name,
+			ssh.TestSetup,
+		},
 	}
 
 	var testWorkflows []*imagetest.TestWorkflow
@@ -57,8 +62,7 @@ func main() {
 			}
 			testWorkflows = append(testWorkflows, test)
 			if err := testPackage.setupFunc(test); err != nil {
-				log.Printf("%s.TestSetup for %s failed: %v", testPackage.name, image, err)
-				test.Disable()
+				log.Fatalf("%s.TestSetup for %s failed: %v", testPackage.name, image, err)
 			}
 		}
 	}

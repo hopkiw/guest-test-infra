@@ -1,0 +1,21 @@
+{
+  "Name": "copy-objects-wf",
+  "GCSPath": "gs://liamh-export/test-setting-gcs-path/",
+  "Sources": {
+    "copy.wf.json": "copy.wf.json"
+  },
+  "Steps": {
+    "copy-objects": {
+      "CopyGCSObjects": [
+        {
+          "Source": "gs://liamh-export/test-copy-gcs-objects-step/subdir/",
+          "Destination": "${OUTSPATH}/other-subdir/",
+          "AclRules": [{"Entity": "allUsers", "Role": "READER"}]
+        }
+      ]
+    }
+  },
+  "Dependencies": {
+    "copy-objects": []
+  }
+}
