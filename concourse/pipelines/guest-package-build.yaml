@@ -301,6 +301,75 @@ jobs:
       name: package-version/version
       tag: package-version/version
       commitish: guest-oslogin/.git/ref
+
+- name: inject-guest-oslogin-staging
+  plan:
+  - in_parallel:
+      steps:
+      - get: guest-oslogin-tag
+        passed: [build-guest-oslogin]
+        trigger: true
+      - get: guest-test-infra
+      - get: compute-image-tools
+  - load_var: package-version
+    file: guest-oslogin-tag/version
+  - task: get-credential
+    file: guest-test-infra/concourse/tasks/get-credential.yaml
+  - task: generate-build-id
+    file: guest-test-infra/concourse/tasks/generate-build-id.yaml
+    vars:
+      prefix: ""
+  - load_var: build-id
+    file: build-id-dir/build-id
+  - in_parallel:
+      fail_fast: true
+      steps:
+      - task: build-package-image-debian-9
+        file: guest-test-infra/concourse/tasks/daisy-build-package-image.yaml
+        vars:
+          source-image: projects/debian-cloud/global/images/family/debian-9
+          dest-image: debian-9-((.:build-id))
+          gcs-package-path: gs://gcp-guest-package-uploads/oslogin/google-compute-engine-oslogin_((.:package-version))-g1+deb9_amd64.deb
+      - task: build-package-image-debian-10
+        file: guest-test-infra/concourse/tasks/daisy-build-package-image.yaml
+        vars:
+          source-image: projects/debian-cloud/global/images/family/debian-10
+          dest-image: debian-10-((.:build-id))
+          gcs-package-path: gs://gcp-guest-package-uploads/oslogin/google-compute-engine-oslogin_((.:package-version))-g1+deb10_amd64.deb
+      - task: build-package-image-debian-11
+        file: guest-test-infra/concourse/tasks/daisy-build-package-image.yaml
+        vars:
+          source-image: projects/debian-cloud/global/images/family/debian-11
+          dest-image: debian-11-((.:build-id))
+          gcs-package-path: gs://gcp-guest-package-uploads/oslogin/google-compute-engine-oslogin_((.:package-version))-g1+deb11_amd64.deb
+      - task: build-package-image-centos-7
+        file: guest-test-infra/concourse/tasks/daisy-build-package-image.yaml
+        vars:
+          source-image: projects/centos-cloud/global/images/family/centos-7
+          dest-image: centos-7-((.:build-id))
+          gcs-package-path: gs://gcp-guest-package-uploads/oslogin/google-compute-engine-oslogin-((.:package-version))-g1.el7.x86_64.rpm
+      - task: build-package-image-rhel-7
+        file: guest-test-infra/concourse/tasks/daisy-build-package-image.yaml
+        vars:
+          source-image: projects/rhel-cloud/global/images/family/rhel-7
+          dest-image: rhel-7-((.:build-id))
+          gcs-package-path: gs://gcp-guest-package-uploads/oslogin/google-compute-engine-oslogin-((.:package-version))-g1.el7.x86_64.rpm
+      - task: build-package-image-centos-8
+        file: guest-test-infra/concourse/tasks/daisy-build-package-image.yaml
+        vars:
+          source-image: projects/centos-cloud/global/images/family/centos-8
+          dest-image: centos-8-((.:build-id))
+          gcs-package-path: gs://gcp-guest-package-uploads/oslogin/google-compute-engine-oslogin-((.:package-version))-g1.el8.x86_64.rpm
+      - task: build-package-image-rhel-8
+        file: guest-test-infra/concourse/tasks/daisy-build-package-image.yaml
+        vars:
+          source-image: projects/rhel-cloud/global/images/family/rhel-8
+          dest-image: rhel-8-((.:build-id))
+          gcs-package-path: gs://gcp-guest-package-uploads/oslogin/google-compute-engine-oslogin-((.:package-version))-g1.el8.x86_64.rpm
+  - task: guest-oslogin-image-tests
+    file: guest-test-infra/concourse/tasks/image-test.yaml
+    vars:
+      images: projects/gcp-guest/global/images/debian-9-((.:build-id)),projects/gcp-guest/global/images/debian-10-((.:build-id)),projects/gcp-guest/global/images/centos-7-((.:build-id)),projects/gcp-guest/global/images/centos-8-((.:build-id)),projects/gcp-guest/global/images/centos-7-((.:build-id)),projects/gcp-guest/global/images/centos-8-((.:build-id))
   - in_parallel:
       fail_fast: true
       steps:
@@ -310,30 +379,79 @@ jobs:
           package_path: oslogin/google-compute-engine-oslogin_((.:package-version))-g1+deb9_amd64.deb
           universe: cloud-apt
           repo: gce-google-compute-engine-oslogin-stretch
+        params:
+          ENVIRONMENT: staging
       - task: inject-guest-oslogin-deb10
         file: guest-test-infra/concourse/tasks/gcloud-inject-package.yaml
         vars:
           package_path: oslogin/google-compute-engine-oslogin_((.:package-version))-g1+deb10_amd64.deb
           universe: cloud-apt
           repo: gce-google-compute-engine-oslogin-buster
+        params:
+          ENVIRONMENT: staging
       - task: inject-guest-oslogin-deb11
         file: guest-test-infra/concourse/tasks/gcloud-inject-package.yaml
         vars:
           package_path: oslogin/google-compute-engine-oslogin_((.:package-version))-g1+deb11_amd64.deb
           universe: cloud-apt
           repo: gce-google-compute-engine-oslogin-bullseye
+        params:
+          ENVIRONMENT: staging
       - task: inject-guest-oslogin-el7
         file: guest-test-infra/concourse/tasks/gcloud-inject-package.yaml
         vars:
           package_path: oslogin/google-compute-engine-oslogin-((.:package-version))-g1.el7.x86_64.rpm
           universe: cloud-yum
           repo: gce-google-compute-engine-oslogin-el7
+        params:
+          ENVIRONMENT: staging
       - task: inject-guest-oslogin-el8
         file: guest-test-infra/concourse/tasks/gcloud-inject-package.yaml
         vars:
           package_path: oslogin/google-compute-engine-oslogin-((.:package-version))-g1.el8.x86_64.rpm
           universe: cloud-yum
           repo: gce-google-compute-engine-oslogin-el8
+        params:
+          ENVIRONMENT: staging
+
+- name: promote-guest-oslogin-stable
+  plan:
+  - get: guest-oslogin-tag
+    passed: [inject-guest-oslogin-staging]
+  - get: guest-test-infra
+  - task: get-credential
+    file: guest-test-infra/concourse/tasks/get-credential.yaml
+  - in_parallel:
+      - task: promote-deb9-stable
+        file: guest-test-infra/concourse/tasks/gcloud-promote-package.yaml
+        vars:
+          universe: cloud-apt
+          repo: gce-google-compute-engine-oslogin-stretch
+          environment: stable
+      - task: promote-deb10-stable
+        file: guest-test-infra/concourse/tasks/gcloud-promote-package.yaml
+        vars:
+          universe: cloud-apt
+          repo: gce-google-compute-engine-oslogin-buster
+          environment: stable
+      - task: promote-deb11-stable
+        file: guest-test-infra/concourse/tasks/gcloud-promote-package.yaml
+        vars:
+          universe: cloud-apt
+          repo: gce-google-compute-engine-oslogin-bullseye
+          environment: stable
+      - task: promote-el7-stable
+        file: guest-test-infra/concourse/tasks/gcloud-promote-package.yaml
+        vars:
+          universe: cloud-yum
+          repo: gce-google-compute-engine-oslogin-el7
+          environment: stable
+      - task: promote-el8-stable
+        file: guest-test-infra/concourse/tasks/gcloud-promote-package.yaml
+        vars:
+          universe: cloud-yum
+          repo: gce-google-compute-engine-oslogin-el8
+          environment: stable
 
 - name: build-osconfig
   plan:
@@ -767,6 +885,8 @@ groups:
 - name: guest-oslogin
   jobs:
   - build-guest-oslogin
+  - inject-guest-oslogin-staging
+  - promote-guest-oslogin-stable
 - name: osconfig
   jobs:
   - build-osconfig
