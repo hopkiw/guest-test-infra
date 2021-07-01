@@ -16,7 +16,7 @@ params:
 run:
   path: /daisy
   args:
-  - -project=gce-image-builder
+  - -project=liamh-testing
   - -zone=us-central1-c
   - -var:google_cloud_repo=stable
   - -var:gcs_url=((gcs_url))
